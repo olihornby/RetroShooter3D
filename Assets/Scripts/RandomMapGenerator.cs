@@ -33,6 +33,9 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField] private LayerMask enemyVisionMask = ~0;
     [SerializeField] private float enemySpawnPadding = 2f;
 
+    [Header("Layer Setup")]
+    [SerializeField] private string generatedGroundLayerName = "Ground";
+
     [Header("Colors")]
     [SerializeField] private Color floorColor = new Color(0.22f, 0.22f, 0.22f);
     [SerializeField] private Color wallColor = new Color(0.35f, 0.35f, 0.35f);
@@ -43,6 +46,7 @@ public class RandomMapGenerator : MonoBehaviour
     private Material wallMaterial;
     private Material coverMaterial;
     private Material enemyMaterial;
+    private int generatedGroundLayer = -1;
 
     private void Start()
     {
@@ -56,6 +60,7 @@ public class RandomMapGenerator : MonoBehaviour
     {
         PrepareRandom();
         PrepareMaterials();
+        ResolveLayers();
         ClearOldMap();
 
         bool[,] wallCells = CreateWallLayout();
@@ -109,6 +114,11 @@ public class RandomMapGenerator : MonoBehaviour
         root.transform.SetParent(transform);
         root.transform.localPosition = Vector3.zero;
         generatedRoot = root.transform;
+    }
+
+    private void ResolveLayers()
+    {
+        generatedGroundLayer = LayerMask.NameToLayer(generatedGroundLayerName);
     }
 
     private bool[,] CreateWallLayout()
@@ -221,6 +231,7 @@ public class RandomMapGenerator : MonoBehaviour
         floor.transform.SetParent(generatedRoot);
         floor.transform.position = transform.position + new Vector3(0f, -floorThickness * 0.5f, 0f);
         floor.transform.localScale = new Vector3(widthWorld, floorThickness, depthWorld);
+        ApplyGroundLayer(floor);
 
         floor.GetComponent<Renderer>().material = floorMaterial;
     }
@@ -337,7 +348,16 @@ public class RandomMapGenerator : MonoBehaviour
         block.transform.SetParent(generatedRoot);
         block.transform.position = worldPosition;
         block.transform.localScale = scale;
+        ApplyGroundLayer(block);
         block.GetComponent<Renderer>().material = material;
+    }
+
+    private void ApplyGroundLayer(GameObject gameObject)
+    {
+        if (generatedGroundLayer >= 0)
+        {
+            gameObject.layer = generatedGroundLayer;
+        }
     }
 
     private Vector3 CellToWorld(int x, int z, float y)

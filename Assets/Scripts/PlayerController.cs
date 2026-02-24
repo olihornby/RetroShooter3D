@@ -15,6 +15,8 @@ public class PlayerController : MonoBehaviour
     
     [Header("Look Settings")]
     [SerializeField] private float mouseSensitivity = 2500f;
+    [SerializeField] private float arrowLookHorizontalSpeed = 120f;
+    [SerializeField] private float arrowLookVerticalSpeed = 80f;
     [SerializeField] private Transform cameraTransform;
     
     [Header("Ground Check")]
@@ -98,7 +100,10 @@ public class PlayerController : MonoBehaviour
     
     private void HandleGroundCheck()
     {
-        isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
+        bool hasGroundMask = groundMask.value != 0;
+        bool maskGrounded = hasGroundMask && Physics.CheckSphere(groundCheck.position, groundDistance, groundMask, QueryTriggerInteraction.Ignore);
+
+        isGrounded = maskGrounded || controller.isGrounded;
         
         if (isGrounded && velocity.y < 0)
         {
@@ -138,8 +143,30 @@ public class PlayerController : MonoBehaviour
     
     private void HandleMouseLook()
     {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+        float keyboardYawInput = 0f;
+        if (Input.GetKey(KeyCode.LeftArrow))
+        {
+            keyboardYawInput -= 1f;
+        }
+        if (Input.GetKey(KeyCode.RightArrow))
+        {
+            keyboardYawInput += 1f;
+        }
+
+        float keyboardPitchInput = 0f;
+        if (Input.GetKey(KeyCode.UpArrow))
+        {
+            keyboardPitchInput += 1f;
+        }
+        if (Input.GetKey(KeyCode.DownArrow))
+        {
+            keyboardPitchInput -= 1f;
+        }
+
+        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime
+            + keyboardYawInput * arrowLookHorizontalSpeed * Time.deltaTime;
+        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime
+            - keyboardPitchInput * arrowLookVerticalSpeed * Time.deltaTime;
         
         // Rotate camera up/down
         xRotation -= mouseY;

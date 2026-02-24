@@ -63,6 +63,8 @@ Assets/Scripts/DamageableTarget.cs.meta
 Assets/Scripts/WeaponController.cs.meta
 Assets/Scripts/Projectile.cs.meta
 Assets/Scripts/CrosshairUI.cs.meta
+Assets/Scripts/EnemyAI.cs.meta
+Assets/Scripts/RandomMapGenerator.cs.meta
 
 # Project-specific ignored model meta files
 *Pistol*.fbx.meta

@@ -55,20 +55,57 @@ public class Projectile : MonoBehaviour
             return;
         }
 
-        if ((hitMask.value & (1 << collision.gameObject.layer)) == 0)
+        Collider hitCollider = collision.collider;
+        if ((hitMask.value & (1 << hitCollider.gameObject.layer)) == 0)
         {
             return;
         }
 
+        Vector3 hitPoint = transform.position;
+        Vector3 hitNormal = -transform.forward;
+        if (collision.contactCount > 0)
+        {
+            ContactPoint contact = collision.GetContact(0);
+            hitPoint = contact.point;
+            hitNormal = contact.normal;
+        }
+
+        HandleImpact(hitCollider, hitPoint, hitNormal);
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!initialized || hasCollided)
+        {
+            return;
+        }
+
+        if ((hitMask.value & (1 << other.gameObject.layer)) == 0)
+        {
+            return;
+        }
+
+        Vector3 hitPoint = other.ClosestPoint(transform.position);
+        Vector3 normal = (transform.position - hitPoint).normalized;
+        if (normal.sqrMagnitude < 0.0001f)
+        {
+            normal = -transform.forward;
+        }
+
+        HandleImpact(other, hitPoint, normal);
+    }
+
+    private void HandleImpact(Collider hitCollider, Vector3 hitPoint, Vector3 hitNormal)
+    {
         hasCollided = true;
 
-        DamageableTarget target = collision.collider.GetComponentInParent<DamageableTarget>();
+        DamageableTarget target = hitCollider.GetComponentInParent<DamageableTarget>();
         if (target != null)
         {
             target.TakeDamage(damage);
         }
 
-        CreateImpactParticles(collision.GetContact(0).point, collision.GetContact(0).normal);
+        CreateImpactParticles(hitPoint, hitNormal);
         Destroy(gameObject);
     }
 

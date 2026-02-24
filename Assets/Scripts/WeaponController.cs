@@ -169,7 +169,7 @@ public class WeaponController : MonoBehaviour
         projectileRenderer.material = material;
 
         SphereCollider sphereCollider = projectile.GetComponent<SphereCollider>();
-        sphereCollider.isTrigger = false;
+        sphereCollider.isTrigger = true;
 
         Rigidbody body = projectile.AddComponent<Rigidbody>();
         body.useGravity = false;

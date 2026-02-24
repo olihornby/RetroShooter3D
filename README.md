@@ -70,6 +70,7 @@ Since this is a script-only project, you'll need to set up the scene in Unity:
 
 - **WASD** - Move
 - **Mouse** - Look around
+- **Arrow Keys** - Alternative camera look control
 - **Space** - Jump
 - **Left Shift** - Sprint
 - **Left Mouse Button** - Fire weapon
@@ -102,6 +103,7 @@ Handles first-person movement, jumping, and camera controls.
 **Features:**
 - WASD movement
 - Mouse look with vertical clamping
+- Arrow-key look support (left/right/up/down)
 - Sprint functionality
 - Jump with ground detection
 - Gravity simulation
@@ -163,6 +165,7 @@ Builds a new random map layout each time Play starts.
 - Boundary walls to contain gameplay space
 - Configurable seed, map size, and density
 - Random enemy spawn points each run
+- Auto-assigns generated geometry to `Ground` layer (if present)
 
 ### EnemyAI.cs
 Controls simple enemy behavior using line-of-sight detection.
