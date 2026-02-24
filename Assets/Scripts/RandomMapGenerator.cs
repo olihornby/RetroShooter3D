@@ -6,8 +6,19 @@ using UnityEngine;
 /// Generates a large enclosed room-based map and room encounters each run.
 /// Attach to an empty GameObject in the scene.
 /// </summary>
-public class RandomMapGenerator : MonoBehaviour
+public partial class RandomMapGenerator : MonoBehaviour
 {
+    private enum RoomArchetype
+    {
+        SmallEmpty,
+        SmallEncounter,
+        LargeEmpty,
+        LargeEncounter,
+        Staircase,
+        HallwayParkour,
+        VerticalParkour
+    }
+
     [Header("Map Size")]
     [SerializeField] private int mapWidth = 256;
     [SerializeField] private int mapDepth = 256;
@@ -89,6 +100,7 @@ public class RandomMapGenerator : MonoBehaviour
     private HashSet<Vector2Int> staircaseShaftCells = new HashSet<Vector2Int>();
     private bool[,] platformCells;
     private float[,] platformTopHeights;
+    private readonly Dictionary<int, RoomArchetype> roomArchetypes = new Dictionary<int, RoomArchetype>();
 
     [Serializable]
     private class EnemyVariant
@@ -205,12 +217,13 @@ public class RandomMapGenerator : MonoBehaviour
         List<Room> rooms;
         bool[,] wallCells = CreateRoomBasedWallLayout(out rooms);
         Room spawnRoom = rooms[0];
+        BuildRoomArchetypePlan(rooms, spawnRoom);
         bool[,] coverCells = CreateCoverLayout(wallCells, spawnRoom, rooms);
 
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
 
-        BuildPlatformFloor(wallCells, spawnRoom);
+        BuildPlatformFloor(wallCells, rooms, spawnRoom);
         BuildWalls(wallCells);
         BuildCover(coverCells, wallCells);
 
@@ -443,30 +456,11 @@ public class RandomMapGenerator : MonoBehaviour
 
         if (UnityEngine.Random.value < longCorridorChance)
         {
-            int mapWidth = cells.GetLength(0);
-            int mapDepth = cells.GetLength(1);
-            bool routeHorizontalFirst = UnityEngine.Random.value < 0.5f;
-
-            if (routeHorizontalFirst)
-            {
-                int midZ = UnityEngine.Random.Range(2, mapDepth - 2);
-                CarveLine(cells, startX, startZ, startX, midZ, radius);
-                CarveLine(cells, startX, midZ, endX, midZ, radius);
-                CarveLine(cells, endX, midZ, endX, endZ, radius);
-            }
-            else
-            {
-                int midX = UnityEngine.Random.Range(2, mapWidth - 2);
-                CarveLine(cells, startX, startZ, midX, startZ, radius);
-                CarveLine(cells, midX, startZ, midX, endZ, radius);
-                CarveLine(cells, midX, endZ, endX, endZ, radius);
-            }
-
+            GenerateLongCorridor(cells, startX, startZ, endX, endZ, radius);
             return;
         }
 
-        CarveLine(cells, startX, startZ, endX, startZ, radius);
-        CarveLine(cells, endX, startZ, endX, endZ, radius);
+        GenerateCorridor(cells, startX, startZ, endX, endZ, radius);
     }
 
     private void CarveLine(bool[,] cells, int startX, int startZ, int endX, int endZ, int radius)
@@ -561,7 +555,7 @@ public class RandomMapGenerator : MonoBehaviour
         }
     }
 
-    private void BuildPlatformFloor(bool[,] wallCells, Room spawnRoom)
+    private void BuildPlatformFloor(bool[,] wallCells, List<Room> rooms, Room spawnRoom)
     {
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
@@ -578,9 +572,6 @@ public class RandomMapGenerator : MonoBehaviour
             }
         }
 
-        int maxLevels = Mathf.Clamp(maxPlatformLevels, 2, 8);
-        float noiseScale = 0.11f;
-
         for (int x = 1; x < width - 1; x++)
         {
             for (int z = 1; z < depth - 1; z++)
@@ -589,25 +580,41 @@ public class RandomMapGenerator : MonoBehaviour
                 {
                     continue;
                 }
+                levels[x, z] = 0;
+            }
+        }
 
-                bool spawnSafe = spawnRoom.Contains(x, z) &&
-                                 Mathf.Abs(x - spawnRoom.CenterX) <= spawnClearRadius &&
-                                 Mathf.Abs(z - spawnRoom.CenterZ) <= spawnClearRadius;
+        for (int roomIndex = 1; roomIndex < rooms.Count; roomIndex++)
+        {
+            Room room = rooms[roomIndex];
+            if (!roomArchetypes.TryGetValue(roomIndex, out RoomArchetype archetype))
+            {
+                continue;
+            }
 
-                bool keepPlatform = spawnSafe || UnityEngine.Random.value > platformVoidChance;
-                if (!keepPlatform)
-                {
-                    continue;
-                }
-
-                float noise = Mathf.PerlinNoise((x + seed * 0.013f) * noiseScale, (z - seed * 0.009f) * noiseScale);
-                int level = Mathf.Clamp(Mathf.RoundToInt(noise * maxLevels), 0, maxLevels);
-                if (spawnSafe)
-                {
-                    level = 0;
-                }
-
-                levels[x, z] = level;
+            switch (archetype)
+            {
+                case RoomArchetype.SmallEmpty:
+                    ApplySmallEmptyRoom(room, levels);
+                    break;
+                case RoomArchetype.SmallEncounter:
+                    ApplySmallEncounterRoom(room, levels);
+                    break;
+                case RoomArchetype.LargeEmpty:
+                    ApplyLargeEmptyRoom(room, levels);
+                    break;
+                case RoomArchetype.LargeEncounter:
+                    ApplyLargeEncounterRoom(room, levels);
+                    break;
+                case RoomArchetype.Staircase:
+                    ApplyStaircaseRoom(room, levels);
+                    break;
+                case RoomArchetype.HallwayParkour:
+                    ApplyHallwayParkourRoom(room, levels);
+                    break;
+                case RoomArchetype.VerticalParkour:
+                    ApplyVerticalParkourRoom(room, levels);
+                    break;
             }
         }
 
@@ -771,24 +778,6 @@ public class RandomMapGenerator : MonoBehaviour
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
 
-        List<int> eligibleRooms = new List<int>();
-        for (int i = 1; i < rooms.Count; i++)
-        {
-            if (rooms[i].Width >= 8 && rooms[i].Depth >= 8)
-            {
-                eligibleRooms.Add(i);
-            }
-        }
-
-        int stairTargets = Mathf.Min(Mathf.Max(1, staircaseCount), eligibleRooms.Count);
-        HashSet<int> staircaseRooms = new HashSet<int>();
-        for (int s = 0; s < stairTargets; s++)
-        {
-            int pick = UnityEngine.Random.Range(0, eligibleRooms.Count);
-            staircaseRooms.Add(eligibleRooms[pick]);
-            eligibleRooms.RemoveAt(pick);
-        }
-
         for (int index = 1; index < rooms.Count; index++)
         {
             Room room = rooms[index];
@@ -797,18 +786,22 @@ public class RandomMapGenerator : MonoBehaviour
                 continue;
             }
 
-            if (staircaseRooms.Contains(index))
+            if (!roomArchetypes.TryGetValue(index, out RoomArchetype archetype))
+            {
+                continue;
+            }
+
+            if (archetype == RoomArchetype.Staircase)
             {
                 BuildStaircaseRoom(room, wallCells, coverCells, width, depth);
                 continue;
             }
 
-            float roll = UnityEngine.Random.value;
-            if (roll < parkourRoomChance)
+            if (archetype == RoomArchetype.HallwayParkour)
             {
                 BuildParkourRoom(room, wallCells, coverCells, width, depth);
             }
-            else if (roll < parkourRoomChance + tallRoomChance)
+            else if (archetype == RoomArchetype.VerticalParkour)
             {
                 BuildTallRoom(room, wallCells, coverCells, width, depth);
             }
@@ -1065,6 +1058,17 @@ public class RandomMapGenerator : MonoBehaviour
 
         for (int index = 1; index < rooms.Count; index++)
         {
+            if (!roomArchetypes.TryGetValue(index, out RoomArchetype archetype))
+            {
+                continue;
+            }
+
+            bool isEncounterRoom = archetype == RoomArchetype.SmallEncounter || archetype == RoomArchetype.LargeEncounter;
+            if (!isEncounterRoom)
+            {
+                continue;
+            }
+
             Room room = rooms[index];
 
             GameObject encounterObj = new GameObject($"Encounter_{index}");
