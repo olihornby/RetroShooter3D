@@ -11,7 +11,7 @@ public class RandomMapGenerator : MonoBehaviour
     [Header("Map Size")]
     [SerializeField] private int mapWidth = 256;
     [SerializeField] private int mapDepth = 256;
-    [SerializeField] private float cellSize = 2f;
+    [SerializeField] private float cellSize = 4f;
 
     [Header("Generation")]
     [SerializeField] private bool generateOnStart = true;
@@ -25,10 +25,11 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.07f;
     [SerializeField, Range(0f, 1f)] private float longCorridorChance = 0.65f;
     [SerializeField, Range(0f, 1f)] private float largeRoomBias = 0.72f;
+    [SerializeField] private int maxCoverPerRoom = 3;
 
     [Header("Block Settings")]
     [SerializeField] private float floorThickness = 0.5f;
-    [SerializeField] private float wallHeight = 10f;
+    [SerializeField] private float wallHeight = 18f;
     [SerializeField] private float ceilingThickness = 0.4f;
     [SerializeField] private float coverHeight = 1.2f;
     [SerializeField] private float floorBoxHeight = 0.7f;
@@ -40,10 +41,10 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float tallRoomChance = 0.35f;
     [SerializeField] private float parkourStepHeight = 0.45f;
     [SerializeField] private int parkourStepCount = 5;
-    [SerializeField] private float tallPlatformHeight = 5.2f;
+    [SerializeField] private float tallPlatformHeight = 9f;
     [SerializeField] private int staircaseCount = 4;
-    [SerializeField, Range(2, 3)] private int maxFloors = 3;
-    [SerializeField] private float floorLevelHeight = 3.2f;
+    [SerializeField, Range(2, 8)] private int maxFloors = 6;
+    [SerializeField] private float floorLevelHeight = 4.2f;
     [SerializeField] private int stairStepsPerFloor = 5;
 
     [Header("Room Encounters")]
@@ -193,7 +194,7 @@ public class RandomMapGenerator : MonoBehaviour
         List<Room> rooms;
         bool[,] wallCells = CreateRoomBasedWallLayout(out rooms);
         Room spawnRoom = rooms[0];
-        bool[,] coverCells = CreateCoverLayout(wallCells, spawnRoom);
+        bool[,] coverCells = CreateCoverLayout(wallCells, spawnRoom, rooms);
 
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
@@ -495,7 +496,7 @@ public class RandomMapGenerator : MonoBehaviour
         }
     }
 
-    private bool[,] CreateCoverLayout(bool[,] wallCells, Room spawnRoom)
+    private bool[,] CreateCoverLayout(bool[,] wallCells, Room spawnRoom, List<Room> rooms)
     {
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
@@ -531,7 +532,53 @@ public class RandomMapGenerator : MonoBehaviour
             }
         }
 
+        ApplyCoverLimitPerRoom(coverCells, rooms, spawnRoom);
+
         return coverCells;
+    }
+
+    private void ApplyCoverLimitPerRoom(bool[,] coverCells, List<Room> rooms, Room spawnRoom)
+    {
+        int limit = Mathf.Max(0, maxCoverPerRoom);
+        for (int roomIndex = 0; roomIndex < rooms.Count; roomIndex++)
+        {
+            Room room = rooms[roomIndex];
+            if (room.Intersects(spawnRoom, 0))
+            {
+                continue;
+            }
+
+            List<Vector2Int> roomCoverCells = new List<Vector2Int>();
+            for (int x = room.MinX + 1; x < room.MaxX; x++)
+            {
+                for (int z = room.MinZ + 1; z < room.MaxZ; z++)
+                {
+                    if (coverCells[x, z])
+                    {
+                        roomCoverCells.Add(new Vector2Int(x, z));
+                    }
+                }
+            }
+
+            if (roomCoverCells.Count <= limit)
+            {
+                continue;
+            }
+
+            for (int i = roomCoverCells.Count - 1; i > 0; i--)
+            {
+                int randomIndex = UnityEngine.Random.Range(0, i + 1);
+                Vector2Int temp = roomCoverCells[i];
+                roomCoverCells[i] = roomCoverCells[randomIndex];
+                roomCoverCells[randomIndex] = temp;
+            }
+
+            for (int i = limit; i < roomCoverCells.Count; i++)
+            {
+                Vector2Int cell = roomCoverCells[i];
+                coverCells[cell.x, cell.y] = false;
+            }
+        }
     }
 
     private void BuildFloor(int width, int depth)
@@ -812,7 +859,7 @@ public class RandomMapGenerator : MonoBehaviour
             return;
         }
 
-        int localCoverCount = UnityEngine.Random.Range(3, 8);
+        int localCoverCount = UnityEngine.Random.Range(0, Mathf.Max(1, maxCoverPerRoom) + 1);
         for (int i = 0; i < localCoverCount; i++)
         {
             int x = UnityEngine.Random.Range(room.MinX + 1, room.MaxX);
