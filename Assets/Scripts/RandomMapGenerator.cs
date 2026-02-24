@@ -9,25 +9,26 @@ using UnityEngine;
 public class RandomMapGenerator : MonoBehaviour
 {
     [Header("Map Size")]
-    [SerializeField] private int mapWidth = 120;
-    [SerializeField] private int mapDepth = 120;
+    [SerializeField] private int mapWidth = 256;
+    [SerializeField] private int mapDepth = 256;
     [SerializeField] private float cellSize = 2f;
 
     [Header("Generation")]
     [SerializeField] private bool generateOnStart = true;
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 12345;
-    [SerializeField, Range(6, 36)] private int desiredRoomCount = 8;
-    [SerializeField, Range(4, 20)] private int minRoomSize = 9;
-    [SerializeField, Range(5, 28)] private int maxRoomSize = 20;
+    [SerializeField, Range(6, 36)] private int desiredRoomCount = 14;
+    [SerializeField, Range(4, 20)] private int minRoomSize = 8;
+    [SerializeField, Range(5, 32)] private int maxRoomSize = 26;
     [SerializeField, Range(1, 4)] private int corridorWidth = 1;
     [SerializeField] private int spawnClearRadius = 5;
     [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.07f;
     [SerializeField, Range(0f, 1f)] private float longCorridorChance = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float largeRoomBias = 0.72f;
 
     [Header("Block Settings")]
     [SerializeField] private float floorThickness = 0.5f;
-    [SerializeField] private float wallHeight = 4.8f;
+    [SerializeField] private float wallHeight = 10f;
     [SerializeField] private float ceilingThickness = 0.4f;
     [SerializeField] private float coverHeight = 1.2f;
     [SerializeField] private float floorBoxHeight = 0.7f;
@@ -39,7 +40,11 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float tallRoomChance = 0.35f;
     [SerializeField] private float parkourStepHeight = 0.45f;
     [SerializeField] private int parkourStepCount = 5;
-    [SerializeField] private float tallPlatformHeight = 2.8f;
+    [SerializeField] private float tallPlatformHeight = 5.2f;
+    [SerializeField] private int staircaseCount = 4;
+    [SerializeField, Range(2, 3)] private int maxFloors = 3;
+    [SerializeField] private float floorLevelHeight = 3.2f;
+    [SerializeField] private int stairStepsPerFloor = 5;
 
     [Header("Room Encounters")]
     [SerializeField] private bool spawnEnemies = true;
@@ -340,8 +345,8 @@ public class RandomMapGenerator : MonoBehaviour
 
         for (int attempt = 0; attempt < attempts && rooms.Count < targetRooms; attempt++)
         {
-            int roomWidth = UnityEngine.Random.Range(minRoomSize, safeMaxRoomSize + 1);
-            int roomDepth = UnityEngine.Random.Range(minRoomSize, safeMaxRoomSize + 1);
+            int roomWidth = GetBiasedRoomSize(minRoomSize, safeMaxRoomSize);
+            int roomDepth = GetBiasedRoomSize(minRoomSize, safeMaxRoomSize);
 
             int minX = UnityEngine.Random.Range(1, width - roomWidth - 1);
             int minZ = UnityEngine.Random.Range(1, depth - roomDepth - 1);
@@ -381,6 +386,20 @@ public class RandomMapGenerator : MonoBehaviour
         }
 
         return cells;
+    }
+
+    private int GetBiasedRoomSize(int minSize, int maxSize)
+    {
+        int clampedMin = Mathf.Max(4, minSize);
+        int clampedMax = Mathf.Max(clampedMin + 1, maxSize);
+        int split = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(clampedMin, clampedMax, 0.55f)), clampedMin, clampedMax);
+
+        if (UnityEngine.Random.value < largeRoomBias)
+        {
+            return UnityEngine.Random.Range(split, clampedMax + 1);
+        }
+
+        return UnityEngine.Random.Range(clampedMin, split + 1);
     }
 
     private Room CreateRoomAround(int centerX, int centerZ, int width, int depth, int mapCellWidth, int mapCellDepth)
@@ -592,11 +611,35 @@ public class RandomMapGenerator : MonoBehaviour
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
 
+        List<int> eligibleRooms = new List<int>();
+        for (int i = 1; i < rooms.Count; i++)
+        {
+            if (rooms[i].Width >= 8 && rooms[i].Depth >= 8)
+            {
+                eligibleRooms.Add(i);
+            }
+        }
+
+        int stairTargets = Mathf.Min(Mathf.Max(0, staircaseCount), eligibleRooms.Count);
+        HashSet<int> staircaseRooms = new HashSet<int>();
+        for (int s = 0; s < stairTargets; s++)
+        {
+            int pick = UnityEngine.Random.Range(0, eligibleRooms.Count);
+            staircaseRooms.Add(eligibleRooms[pick]);
+            eligibleRooms.RemoveAt(pick);
+        }
+
         for (int index = 1; index < rooms.Count; index++)
         {
             Room room = rooms[index];
             if (room.Width < 6 || room.Depth < 6)
             {
+                continue;
+            }
+
+            if (staircaseRooms.Contains(index))
+            {
+                BuildStaircaseRoom(room, wallCells, coverCells, width, depth);
                 continue;
             }
 
@@ -612,6 +655,70 @@ public class RandomMapGenerator : MonoBehaviour
             else
             {
                 BuildVariedCoverRoom(room, spawnRoom, wallCells, coverCells, width, depth);
+            }
+        }
+    }
+
+    private void BuildStaircaseRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
+    {
+        int floors = Mathf.Clamp(maxFloors, 2, 3);
+        int stepsPerFloor = Mathf.Clamp(stairStepsPerFloor, 3, 8);
+
+        bool alongX = room.Width >= room.Depth;
+        int baseX = alongX ? room.MinX + 1 : room.CenterX;
+        int baseZ = alongX ? room.CenterZ : room.MinZ + 1;
+        int direction = UnityEngine.Random.value < 0.5f ? 1 : -1;
+
+        for (int floor = 1; floor < floors; floor++)
+        {
+            float levelHeight = floorLevelHeight * floor;
+            for (int step = 0; step < stepsPerFloor; step++)
+            {
+                int x = alongX ? baseX + (step + (floor - 1) * (stepsPerFloor + 1)) * direction : baseX;
+                int z = alongX ? baseZ : baseZ + (step + (floor - 1) * (stepsPerFloor + 1)) * direction;
+
+                if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
+                {
+                    break;
+                }
+
+                if (wallCells[x, z])
+                {
+                    continue;
+                }
+
+                float stepHeight = Mathf.Lerp(levelHeight - floorLevelHeight + 0.6f, levelHeight, (step + 1f) / stepsPerFloor);
+                stepHeight = Mathf.Clamp(stepHeight, 0.6f, wallHeight - 1f);
+
+                Vector3 worldPosition = CellToWorld(x, z, stepHeight * 0.5f, width, depth);
+                Vector3 scale = new Vector3(cellSize * 0.72f, stepHeight, cellSize * 0.72f);
+                CreateBlock($"Staircase_{x}_{z}", worldPosition, scale, coverMaterial);
+                coverCells[x, z] = true;
+            }
+
+            int platformRadius = 1;
+            int platformCenterX = room.CenterX + (alongX ? direction * Mathf.Min(floor, 2) : 0);
+            int platformCenterZ = room.CenterZ + (alongX ? 0 : direction * Mathf.Min(floor, 2));
+            for (int px = platformCenterX - platformRadius; px <= platformCenterX + platformRadius; px++)
+            {
+                for (int pz = platformCenterZ - platformRadius; pz <= platformCenterZ + platformRadius; pz++)
+                {
+                    if (px <= room.MinX || px >= room.MaxX || pz <= room.MinZ || pz >= room.MaxZ)
+                    {
+                        continue;
+                    }
+
+                    if (wallCells[px, pz])
+                    {
+                        continue;
+                    }
+
+                    float platformHeight = Mathf.Clamp(levelHeight, 0.8f, wallHeight - 0.8f);
+                    Vector3 worldPosition = CellToWorld(px, pz, platformHeight * 0.5f, width, depth);
+                    Vector3 scale = new Vector3(cellSize * 0.85f, platformHeight, cellSize * 0.85f);
+                    CreateBlock($"Landing_{px}_{pz}", worldPosition, scale, coverMaterial);
+                    coverCells[px, pz] = true;
+                }
             }
         }
     }
