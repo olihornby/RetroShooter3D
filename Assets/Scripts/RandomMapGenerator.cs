@@ -791,27 +791,11 @@ public partial class RandomMapGenerator : MonoBehaviour
             }
 
             Room room = rooms[roomIndex];
-            bool alongX = room.Width >= room.Depth;
-
-            int minPrimary = alongX ? room.MinX + 2 : room.MinZ + 2;
-            int maxPrimary = alongX ? room.MaxX - 2 : room.MaxZ - 2;
-            int lane = alongX ? room.CenterZ : room.CenterX;
-
-            for (int primary = minPrimary; primary <= maxPrimary; primary++)
+            for (int x = room.MinX + 1; x < room.MaxX; x++)
             {
-                for (int lateralOffset = -1; lateralOffset <= 1; lateralOffset++)
+                for (int z = room.MinZ + 1; z < room.MaxZ; z++)
                 {
-                    int x = alongX ? primary : lane + lateralOffset;
-                    int z = alongX ? lane + lateralOffset : primary;
-
-                    if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
-                    {
-                        continue;
-                    }
-
-                    Vector2Int cell = new Vector2Int(x, z);
-                    staircaseFloorHoleCells.Add(cell);
-                    staircaseShaftCells.Add(cell);
+                    staircaseFloorHoleCells.Add(new Vector2Int(x, z));
                 }
             }
         }
