@@ -25,6 +25,7 @@ public class WeaponController : MonoBehaviour
     [SerializeField] private Vector3 pistolLocalScale = Vector3.one;
     [SerializeField] private Vector3 defaultMuzzleLocalPosition = new Vector3(0f, 0f, -0.35f);
     [SerializeField] private float muzzleForwardOffset = 0.06f;
+    [SerializeField] private Vector3 muzzleLocalOffset = new Vector3(0f, 0.025f, 0f);
 
     [Header("Visuals")]
     [SerializeField] private bool generateWeaponModel = true;
@@ -76,7 +77,7 @@ public class WeaponController : MonoBehaviour
 
         Vector3 fireDirection = cameraTransform.forward;
         Vector3 spawnPosition = muzzleTransform != null
-            ? muzzleTransform.position + fireDirection * muzzleForwardOffset
+            ? muzzleTransform.position + muzzleTransform.TransformDirection(muzzleLocalOffset) + fireDirection * muzzleForwardOffset
             : cameraTransform.position + fireDirection * 0.6f;
         Quaternion spawnRotation = Quaternion.LookRotation(fireDirection);
         GameObject projectileInstance = Instantiate(projectilePrefab, spawnPosition, spawnRotation);
@@ -277,7 +278,9 @@ public class WeaponController : MonoBehaviour
 
         Vector3 forward = cameraTransform != null ? cameraTransform.forward : weaponModelRoot.forward;
         float reach = Mathf.Max(combinedBounds.extents.x, combinedBounds.extents.y, combinedBounds.extents.z);
-        Vector3 worldFrontPoint = combinedBounds.center + forward * reach;
+        Vector3 worldFrontPoint = combinedBounds.center
+            + forward * reach
+            + (cameraTransform != null ? cameraTransform.up : weaponModelRoot.up) * (combinedBounds.extents.y * 0.2f);
 
         muzzle.position = worldFrontPoint;
         muzzle.rotation = Quaternion.LookRotation(forward, Vector3.up);
