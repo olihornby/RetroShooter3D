@@ -9,6 +9,8 @@ public class WeaponController : MonoBehaviour
     [Header("Weapon Stats")]
     [SerializeField] private float damage = 25f;
     [SerializeField] private float fireRate = 5f;
+    [SerializeField] private int magazineSize = 8;
+    [SerializeField] private float reloadCooldown = 1.5f;
     [SerializeField] private float projectileSpeed = 55f;
     [SerializeField] private float projectileLifetime = 3f;
     [SerializeField] private LayerMask hitMask = ~0;
@@ -34,7 +36,14 @@ public class WeaponController : MonoBehaviour
     [SerializeField] private Color projectileColor = new Color(0.6f, 0.6f, 0.6f);
 
     private float nextTimeToFire;
+    private float reloadCompleteTime;
+    private int currentAmmo;
+    private bool isReloading;
     private GameObject projectilePrefab;
+
+    public int CurrentAmmo => currentAmmo;
+    public int MaxAmmo => Mathf.Max(1, magazineSize);
+    public bool IsReloading => isReloading;
 
     private void Start()
     {
@@ -52,6 +61,7 @@ public class WeaponController : MonoBehaviour
         }
 
         EnsureCrosshair();
+        currentAmmo = Mathf.Max(1, magazineSize);
     }
 
     private void Update()
@@ -61,11 +71,50 @@ public class WeaponController : MonoBehaviour
             return;
         }
 
-        if (Input.GetButton("Fire1") && Time.time >= nextTimeToFire)
+        if (isReloading)
         {
-            nextTimeToFire = Time.time + 1f / fireRate;
-            Fire();
+            if (Time.time >= reloadCompleteTime)
+            {
+                isReloading = false;
+                currentAmmo = Mathf.Max(1, magazineSize);
+            }
+
+            return;
         }
+
+        if (Input.GetButtonDown("Fire1"))
+        {
+            TryFire();
+        }
+    }
+
+    private void TryFire()
+    {
+        if (Time.time < nextTimeToFire)
+        {
+            return;
+        }
+
+        if (currentAmmo <= 0)
+        {
+            StartReload();
+            return;
+        }
+
+        nextTimeToFire = Time.time + 1f / fireRate;
+        Fire();
+        currentAmmo--;
+
+        if (currentAmmo <= 0)
+        {
+            StartReload();
+        }
+    }
+
+    private void StartReload()
+    {
+        isReloading = true;
+        reloadCompleteTime = Time.time + reloadCooldown;
     }
 
     private void Fire()

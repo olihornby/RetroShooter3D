@@ -10,14 +10,27 @@ public class CrosshairUI : MonoBehaviour
     [SerializeField] private float size = 14f;
     [SerializeField] private float thickness = 2f;
     [SerializeField] private float gap = 4f;
+    [SerializeField] private Vector2 ammoTextOffset = new Vector2(0f, 28f);
+    [SerializeField] private int ammoFontSize = 16;
 
     private Texture2D pixel;
+    private GUIStyle ammoStyle;
+    private WeaponController weaponController;
 
     private void Awake()
     {
         pixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
         pixel.SetPixel(0, 0, Color.white);
         pixel.Apply();
+
+        ammoStyle = new GUIStyle(GUI.skin.label)
+        {
+            alignment = TextAnchor.UpperCenter,
+            fontSize = ammoFontSize,
+            normal = { textColor = crosshairColor }
+        };
+
+        weaponController = GetComponentInParent<WeaponController>();
     }
 
     private void OnGUI()
@@ -37,6 +50,30 @@ public class CrosshairUI : MonoBehaviour
         DrawRect(centerX + gap, centerY - thickness * 0.5f, size, thickness);
         DrawRect(centerX - thickness * 0.5f, centerY - halfSize - gap, thickness, size);
         DrawRect(centerX - thickness * 0.5f, centerY + gap, thickness, size);
+
+        DrawAmmo(centerX, centerY);
+    }
+
+    private void DrawAmmo(float centerX, float centerY)
+    {
+        if (weaponController == null)
+        {
+            return;
+        }
+
+        ammoStyle.normal.textColor = crosshairColor;
+        ammoStyle.fontSize = ammoFontSize;
+
+        string ammoText = weaponController.IsReloading
+            ? "Reloading..."
+            : $"Ammo: {weaponController.CurrentAmmo}/{weaponController.MaxAmmo}";
+
+        Rect textRect = new Rect(
+            centerX - 110f + ammoTextOffset.x,
+            centerY + ammoTextOffset.y,
+            220f,
+            28f);
+        GUI.Label(textRect, ammoText, ammoStyle);
     }
 
     private void DrawRect(float x, float y, float width, float height)

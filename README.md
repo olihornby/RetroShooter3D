@@ -111,8 +111,9 @@ Generates a simple voxel-style 8-bit player model at runtime.
 Adds a basic first-person weapon with visible projectile shooting.
 
 **Features:**
-- Left-click firing (`Fire1` input)
+- Left-click single-shot firing (`Fire1` on click)
 - Fire-rate limit
+- 8-round magazine with reload cooldown when empty
 - Adjustable projectile speed, lifetime, and damage
 - Projectile spawn from gun muzzle point (not camera center)
 - Supports imported pistol model prefab with transform offsets
@@ -126,6 +127,7 @@ Draws a simple center-screen crosshair for aiming.
 - Auto-added to camera by `WeaponController`
 - Lightweight UI using `OnGUI`
 - Adjustable color, size, thickness, and gap
+- Shows ammo (`current/max`) and `Reloading...` status text
 
 ### Projectile.cs
 Handles projectile movement, collision, damage, and impact VFX.
