@@ -940,56 +940,52 @@ public partial class RandomMapGenerator : MonoBehaviour
 
         for (int floor = 1; floor < floors; floor++)
         {
-            float levelHeight = floorLevelHeight * floor;
+            float startHeight = floorLevelHeight * (floor - 1) + 0.35f;
+            float endHeight = floorLevelHeight * floor;
             int lane = laneStart + (floor - 1) * laneDirection;
             bool forward = floor % 2 == 1;
 
-            int lastX = alongX ? (forward ? maxPrimary : minPrimary) : lane;
-            int lastZ = alongX ? lane : (forward ? maxPrimary : minPrimary);
+            int runStartPrimary = forward ? minPrimary : maxPrimary;
+            int runEndPrimary = forward ? maxPrimary : minPrimary;
 
-            for (int step = 0; step < stepsPerFloor; step++)
+            int runStartX = alongX ? runStartPrimary : lane;
+            int runStartZ = alongX ? lane : runStartPrimary;
+            int runEndX = alongX ? runEndPrimary : lane;
+            int runEndZ = alongX ? lane : runEndPrimary;
+
+            if (runStartX <= room.MinX || runStartX >= room.MaxX || runStartZ <= room.MinZ || runStartZ >= room.MaxZ)
             {
-                float t = (step + 1f) / stepsPerFloor;
-                int primary = forward
-                    ? Mathf.RoundToInt(Mathf.Lerp(minPrimary, maxPrimary, t))
-                    : Mathf.RoundToInt(Mathf.Lerp(maxPrimary, minPrimary, t));
-
-                int x = alongX ? primary : lane;
-                int z = alongX ? lane : primary;
-
-                if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
-                {
-                    continue;
-                }
-
-                if (wallCells[x, z])
-                {
-                    continue;
-                }
-
-                float stepHeight = Mathf.Lerp(levelHeight - floorLevelHeight + 0.6f, levelHeight, t);
-                stepHeight = Mathf.Clamp(stepHeight, 0.6f, wallHeight - 1f);
-
-                Vector3 worldPosition = CellToWorld(x, z, stepHeight * 0.5f, width, depth);
-                Vector3 scale = new Vector3(cellSize * 0.72f, stepHeight, cellSize * 0.72f);
-                CreateBlock($"Staircase_{floor}_{x}_{z}", worldPosition, scale, coverMaterial);
-                coverCells[x, z] = true;
-                RegisterPlatformCellHeight(x, z, stepHeight);
-                MarkStairShaftCell(x, z, width, depth);
-
-                lastX = x;
-                lastZ = z;
+                continue;
             }
+
+            if (runEndX <= room.MinX || runEndX >= room.MaxX || runEndZ <= room.MinZ || runEndZ >= room.MaxZ)
+            {
+                continue;
+            }
+
+            CreateRampSegment(
+                floor,
+                runStartX,
+                runStartZ,
+                startHeight,
+                runEndX,
+                runEndZ,
+                endHeight,
+                width,
+                depth,
+                room,
+                wallCells,
+                coverCells);
 
             int nextLane = lane + laneDirection;
             if (nextLane > minLane - 1 && nextLane < minLane + laneCapacity)
             {
-                int landingX = alongX ? lastX : nextLane;
-                int landingZ = alongX ? nextLane : lastZ;
+                int landingX = alongX ? runEndX : nextLane;
+                int landingZ = alongX ? nextLane : runEndZ;
 
                 if (landingX > room.MinX && landingX < room.MaxX && landingZ > room.MinZ && landingZ < room.MaxZ && !wallCells[landingX, landingZ])
                 {
-                    float platformHeight = Mathf.Clamp(levelHeight, 0.8f, wallHeight - 0.8f);
+                    float platformHeight = Mathf.Clamp(endHeight, 0.8f, GetTotalWallHeight() - 0.8f);
                     Vector3 worldPosition = CellToWorld(landingX, landingZ, platformHeight * 0.5f, width, depth);
                     Vector3 scale = new Vector3(cellSize * 0.8f, platformHeight, cellSize * 0.8f);
                     CreateBlock($"Landing_{floor}_{landingX}_{landingZ}", worldPosition, scale, coverMaterial);
@@ -998,6 +994,80 @@ public partial class RandomMapGenerator : MonoBehaviour
                     MarkStairShaftCell(landingX, landingZ, width, depth);
                 }
             }
+        }
+    }
+
+    private void CreateRampSegment(
+        int floorIndex,
+        int startX,
+        int startZ,
+        float startHeight,
+        int endX,
+        int endZ,
+        float endHeight,
+        int width,
+        int depth,
+        Room room,
+        bool[,] wallCells,
+        bool[,] coverCells)
+    {
+        Vector3 startWorld = CellToWorld(startX, startZ, startHeight, width, depth);
+        Vector3 endWorld = CellToWorld(endX, endZ, endHeight, width, depth);
+
+        Vector3 horizontal = new Vector3(endWorld.x - startWorld.x, 0f, endWorld.z - startWorld.z);
+        float horizontalDistance = horizontal.magnitude;
+        if (horizontalDistance < 0.01f)
+        {
+            return;
+        }
+
+        float rise = endHeight - startHeight;
+        float rampLength = Mathf.Sqrt(horizontalDistance * horizontalDistance + rise * rise);
+        Vector3 rampCenter = (startWorld + endWorld) * 0.5f;
+
+        GameObject ramp = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ramp.name = $"StairRamp_{floorIndex}_{startX}_{startZ}_{endX}_{endZ}";
+        ramp.transform.SetParent(generatedRoot);
+        ramp.transform.position = rampCenter;
+
+        Quaternion yaw = Quaternion.LookRotation(horizontal.normalized, Vector3.up);
+        float pitch = -Mathf.Atan2(rise, horizontalDistance) * Mathf.Rad2Deg;
+        ramp.transform.rotation = yaw * Quaternion.Euler(pitch, 0f, 0f);
+        ramp.transform.localScale = new Vector3(cellSize * 0.82f, floorThickness, rampLength + cellSize * 0.35f);
+        ApplyGroundLayer(ramp);
+        ramp.GetComponent<Renderer>().material = coverMaterial;
+
+        Vector3 supportCenter = (startWorld + new Vector3(endWorld.x, startWorld.y, endWorld.z)) * 0.5f;
+        GameObject support = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        support.name = $"RampSupport_{floorIndex}_{startX}_{startZ}_{endX}_{endZ}";
+        support.transform.SetParent(generatedRoot);
+        support.transform.position = new Vector3(supportCenter.x, startHeight - floorThickness * 0.5f, supportCenter.z);
+        support.transform.rotation = yaw;
+        support.transform.localScale = new Vector3(cellSize * 0.9f, floorThickness, horizontalDistance + cellSize * 0.45f);
+        ApplyGroundLayer(support);
+        support.GetComponent<Renderer>().material = floorMaterial;
+
+        int samples = Mathf.Max(4, Mathf.RoundToInt(horizontalDistance / cellSize) + 2);
+        for (int sample = 0; sample <= samples; sample++)
+        {
+            float t = sample / (float)samples;
+            int x = Mathf.RoundToInt(Mathf.Lerp(startX, endX, t));
+            int z = Mathf.RoundToInt(Mathf.Lerp(startZ, endZ, t));
+
+            if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
+            {
+                continue;
+            }
+
+            if (wallCells[x, z])
+            {
+                continue;
+            }
+
+            float topY = Mathf.Lerp(startHeight, endHeight, t);
+            coverCells[x, z] = true;
+            RegisterPlatformCellHeight(x, z, topY);
+            MarkStairShaftCell(x, z, width, depth);
         }
     }
 
