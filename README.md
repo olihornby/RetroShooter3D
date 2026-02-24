@@ -72,7 +72,8 @@ RetroShooter3D/
 │   └── Scripts/
 │       ├── PlayerController.cs      # First-person movement & camera
 │       ├── VoxelPlayerModel.cs      # 8-bit player model generator
-│       ├── WeaponController.cs      # Hitscan weapon firing
+│       ├── WeaponController.cs      # Projectile weapon firing
+│       ├── Projectile.cs            # Projectile movement + impact effects
 │       └── DamageableTarget.cs      # Basic health/damage receiver
 └── README.md
 ```
@@ -99,13 +100,23 @@ Generates a simple voxel-style 8-bit player model at runtime.
 - Automatic model assembly
 
 ### WeaponController.cs
-Adds a basic first-person weapon with hitscan shooting.
+Adds a basic first-person weapon with visible projectile shooting.
 
 **Features:**
 - Left-click firing (`Fire1` input)
 - Fire-rate limit
-- Adjustable range and damage
+- Adjustable projectile speed, lifetime, and damage
 - Procedural 8-bit style weapon model
+- Grey projectile visuals
+
+### Projectile.cs
+Handles projectile movement, collision, damage, and impact VFX.
+
+**Features:**
+- Physics-based forward projectile motion
+- Grey projectile model with short trail
+- Layer-mask-based hit filtering
+- Impact particle burst for a more realistic hit feel
 
 ### DamageableTarget.cs
 Adds health and death behavior for shootable targets.

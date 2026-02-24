@@ -58,6 +58,10 @@ crashlytics-build.properties
 [Aa]ssets/[Ss]treamingAssets/aa.meta
 [Aa]ssets/[Ss]treamingAssets/aa/*
 
+# Project-specific ignored script meta files
+Assets/Scripts/DamageableTarget.cs.meta
+Assets/Scripts/WeaponController.cs.meta
+
 # OS generated files
 .DS_Store
 .DS_Store?
