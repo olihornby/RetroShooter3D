@@ -841,11 +841,13 @@ public class RandomMapGenerator : MonoBehaviour
 
         if (controller != null)
         {
-            spawnY = spawnBase.y + controller.height * 0.5f + 0.05f;
+            float floorY = ResolveGeneratedFloorY(spawnBase);
+            float bottomOffset = controller.center.y - controller.height * 0.5f;
+            spawnY = floorY - bottomOffset + 0.05f;
         }
         else
         {
-            spawnY = spawnBase.y + fallbackPlayerSpawnHeight;
+            spawnY = ResolveGeneratedFloorY(spawnBase) + fallbackPlayerSpawnHeight;
         }
 
         player.transform.position = new Vector3(spawnBase.x, spawnY, spawnBase.z);
@@ -856,6 +858,20 @@ public class RandomMapGenerator : MonoBehaviour
         }
 
         return true;
+    }
+
+    private float ResolveGeneratedFloorY(Vector3 spawnBase)
+    {
+        Vector3 rayOrigin = spawnBase + Vector3.up * Mathf.Max(25f, wallHeight + 10f);
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, 100f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (generatedRoot != null && hit.transform != null && hit.transform.IsChildOf(generatedRoot))
+            {
+                return hit.point.y;
+            }
+        }
+
+        return transform.position.y;
     }
 
     private Vector3 CellToWorld(int x, int z, float y, int width, int depth)
