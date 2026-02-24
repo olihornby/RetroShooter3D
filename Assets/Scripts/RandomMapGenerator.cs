@@ -33,7 +33,6 @@ public partial class RandomMapGenerator : MonoBehaviour
     [SerializeField] private int maxRoomSize = 26;
     [SerializeField, Range(1, 4)] private int corridorWidth = 1;
     [SerializeField] private int spawnClearRadius = 5;
-    [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.07f;
     [SerializeField, Range(0f, 1f)] private float longCorridorChance = 0.65f;
     [SerializeField, Range(0f, 1f)] private float largeRoomBias = 0.72f;
     [SerializeField] private int maxCoverPerRoom = 3;
@@ -44,19 +43,15 @@ public partial class RandomMapGenerator : MonoBehaviour
     [SerializeField] private float ceilingThickness = 0.4f;
     [SerializeField] private int stackedFloorCount = 3;
     [SerializeField, Range(2, 16)] private int ceilingTileSpanCells = 8;
-    [SerializeField, Range(0f, 0.6f)] private float platformVoidChance = 0.22f;
     [SerializeField, Range(2, 8)] private int maxPlatformLevels = 4;
     [SerializeField] private float platformLevelHeight = 1.2f;
     [SerializeField, Range(0.5f, 0.98f)] private float platformFootprintMin = 0.62f;
     [SerializeField, Range(0.5f, 0.98f)] private float platformFootprintMax = 0.86f;
     [SerializeField] private float coverHeight = 1.2f;
     [SerializeField] private float floorBoxHeight = 0.7f;
-    [SerializeField, Range(0f, 0.5f)] private float floorBoxChance = 0.08f;
 
     [Header("Room Features")]
     [SerializeField] private bool enableRoomFeatures = true;
-    [SerializeField, Range(0f, 1f)] private float parkourRoomChance = 0.45f;
-    [SerializeField, Range(0f, 1f)] private float tallRoomChance = 0.35f;
     [SerializeField] private float parkourStepHeight = 0.45f;
     [SerializeField] private int parkourStepCount = 5;
     [SerializeField] private float tallPlatformHeight = 9f;
@@ -229,7 +224,7 @@ public partial class RandomMapGenerator : MonoBehaviour
         BuildParkourRoomWalls(rooms, wallCells);
         BuildCover(coverCells, wallCells);
 
-        if (enableRoomFeatures && GetStackedFloorCount() <= 1)
+        if (enableRoomFeatures)
         {
             BuildRoomFeatures(rooms, spawnRoom, wallCells, coverCells);
         }
