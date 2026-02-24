@@ -253,12 +253,12 @@ public class WeaponController : MonoBehaviour
 
         if (hudTextStyle == null)
         {
-            hudTextStyle = new GUIStyle(GUI.skin.label)
+            hudTextStyle = new GUIStyle
             {
                 alignment = TextAnchor.UpperCenter,
-                fontSize = hudFontSize,
-                normal = { textColor = hudColor }
+                fontSize = hudFontSize
             };
+            hudTextStyle.normal.textColor = hudColor;
         }
     }
 

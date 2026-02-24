@@ -127,9 +127,25 @@ public class PlayerController : MonoBehaviour
     
     private void HandleMovement()
     {
-        // Get input
-        float x = Input.GetAxisRaw("Horizontal");
-        float z = Input.GetAxisRaw("Vertical");
+        float x = 0f;
+        float z = 0f;
+
+        if (Input.GetKey(KeyCode.A))
+        {
+            x -= 1f;
+        }
+        if (Input.GetKey(KeyCode.D))
+        {
+            x += 1f;
+        }
+        if (Input.GetKey(KeyCode.S))
+        {
+            z -= 1f;
+        }
+        if (Input.GetKey(KeyCode.W))
+        {
+            z += 1f;
+        }
         
         // Calculate movement direction relative to player rotation
         Vector3 move = (transform.right * x + transform.forward * z).normalized;
