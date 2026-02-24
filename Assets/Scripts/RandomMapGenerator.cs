@@ -32,6 +32,11 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField] private float wallHeight = 18f;
     [SerializeField] private float ceilingThickness = 0.4f;
     [SerializeField, Range(2, 16)] private int ceilingTileSpanCells = 8;
+    [SerializeField, Range(0f, 0.6f)] private float platformVoidChance = 0.22f;
+    [SerializeField, Range(2, 8)] private int maxPlatformLevels = 4;
+    [SerializeField] private float platformLevelHeight = 1.2f;
+    [SerializeField, Range(0.5f, 0.98f)] private float platformFootprintMin = 0.62f;
+    [SerializeField, Range(0.5f, 0.98f)] private float platformFootprintMax = 0.86f;
     [SerializeField] private float coverHeight = 1.2f;
     [SerializeField] private float floorBoxHeight = 0.7f;
     [SerializeField, Range(0f, 0.5f)] private float floorBoxChance = 0.08f;
@@ -82,6 +87,8 @@ public class RandomMapGenerator : MonoBehaviour
     private int pendingSpawnAttempts;
     private const int MaxSpawnAttempts = 180;
     private HashSet<Vector2Int> staircaseShaftCells = new HashSet<Vector2Int>();
+    private bool[,] platformCells;
+    private float[,] platformTopHeights;
 
     [Serializable]
     private class EnemyVariant
@@ -203,8 +210,7 @@ public class RandomMapGenerator : MonoBehaviour
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
 
-        BuildFloor(width, depth);
-        BuildCeiling(width, depth);
+        BuildPlatformFloor(wallCells, spawnRoom);
         BuildWalls(wallCells);
         BuildCover(coverCells, wallCells);
 
@@ -212,6 +218,8 @@ public class RandomMapGenerator : MonoBehaviour
         {
             BuildRoomFeatures(rooms, spawnRoom, wallCells, coverCells);
         }
+
+        BuildCeiling(width, depth);
 
         if (autoPositionPlayer)
         {
@@ -553,18 +561,150 @@ public class RandomMapGenerator : MonoBehaviour
         }
     }
 
-    private void BuildFloor(int width, int depth)
+    private void BuildPlatformFloor(bool[,] wallCells, Room spawnRoom)
     {
-        float widthWorld = width * cellSize;
-        float depthWorld = depth * cellSize;
+        int width = wallCells.GetLength(0);
+        int depth = wallCells.GetLength(1);
 
-        GameObject floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        floor.name = "Floor";
-        floor.transform.SetParent(generatedRoot);
-        floor.transform.position = transform.position + new Vector3(0f, -floorThickness * 0.5f, 0f);
-        floor.transform.localScale = new Vector3(widthWorld, floorThickness, depthWorld);
-        ApplyGroundLayer(floor);
-        floor.GetComponent<Renderer>().material = floorMaterial;
+        platformCells = new bool[width, depth];
+        platformTopHeights = new float[width, depth];
+
+        int[,] levels = new int[width, depth];
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < depth; z++)
+            {
+                levels[x, z] = -1;
+            }
+        }
+
+        int maxLevels = Mathf.Clamp(maxPlatformLevels, 2, 8);
+        float noiseScale = 0.11f;
+
+        for (int x = 1; x < width - 1; x++)
+        {
+            for (int z = 1; z < depth - 1; z++)
+            {
+                if (wallCells[x, z])
+                {
+                    continue;
+                }
+
+                bool spawnSafe = spawnRoom.Contains(x, z) &&
+                                 Mathf.Abs(x - spawnRoom.CenterX) <= spawnClearRadius &&
+                                 Mathf.Abs(z - spawnRoom.CenterZ) <= spawnClearRadius;
+
+                bool keepPlatform = spawnSafe || UnityEngine.Random.value > platformVoidChance;
+                if (!keepPlatform)
+                {
+                    continue;
+                }
+
+                float noise = Mathf.PerlinNoise((x + seed * 0.013f) * noiseScale, (z - seed * 0.009f) * noiseScale);
+                int level = Mathf.Clamp(Mathf.RoundToInt(noise * maxLevels), 0, maxLevels);
+                if (spawnSafe)
+                {
+                    level = 0;
+                }
+
+                levels[x, z] = level;
+            }
+        }
+
+        for (int pass = 0; pass < 3; pass++)
+        {
+            for (int x = 1; x < width - 1; x++)
+            {
+                for (int z = 1; z < depth - 1; z++)
+                {
+                    if (levels[x, z] < 0)
+                    {
+                        continue;
+                    }
+
+                    int minNeighbor = int.MaxValue;
+                    bool hasNeighbor = false;
+                    for (int direction = 0; direction < 4; direction++)
+                    {
+                        int nx = x + (direction == 0 ? 1 : direction == 1 ? -1 : 0);
+                        int nz = z + (direction == 2 ? 1 : direction == 3 ? -1 : 0);
+                        if (levels[nx, nz] >= 0)
+                        {
+                            minNeighbor = Mathf.Min(minNeighbor, levels[nx, nz]);
+                            hasNeighbor = true;
+                        }
+                    }
+
+                    if (hasNeighbor && levels[x, z] > minNeighbor + 1)
+                    {
+                        levels[x, z] = minNeighbor + 1;
+                    }
+                }
+            }
+        }
+
+        float minFootprint = Mathf.Clamp(Mathf.Min(platformFootprintMin, platformFootprintMax), 0.5f, 0.98f);
+        float maxFootprint = Mathf.Clamp(Mathf.Max(platformFootprintMin, platformFootprintMax), minFootprint, 0.98f);
+
+        for (int x = 1; x < width - 1; x++)
+        {
+            for (int z = 1; z < depth - 1; z++)
+            {
+                int level = levels[x, z];
+                if (level < 0)
+                {
+                    continue;
+                }
+
+                float topY = level * platformLevelHeight;
+                float centerY = topY - floorThickness * 0.5f;
+                float footprint = cellSize * UnityEngine.Random.Range(minFootprint, maxFootprint);
+
+                GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                tile.name = $"Platform_{x}_{z}";
+                tile.transform.SetParent(generatedRoot);
+                tile.transform.position = CellToWorld(x, z, centerY, width, depth);
+                tile.transform.localScale = new Vector3(footprint, floorThickness, footprint);
+                ApplyGroundLayer(tile);
+                tile.GetComponent<Renderer>().material = floorMaterial;
+
+                platformCells[x, z] = true;
+                platformTopHeights[x, z] = topY;
+            }
+        }
+
+        EnsureSpawnPlatforms(width, depth, spawnRoom);
+    }
+
+    private void EnsureSpawnPlatforms(int width, int depth, Room spawnRoom)
+    {
+        int minX = Mathf.Clamp(spawnRoom.CenterX - 1, 1, width - 2);
+        int maxX = Mathf.Clamp(spawnRoom.CenterX + 1, 1, width - 2);
+        int minZ = Mathf.Clamp(spawnRoom.CenterZ - 1, 1, depth - 2);
+        int maxZ = Mathf.Clamp(spawnRoom.CenterZ + 1, 1, depth - 2);
+
+        for (int x = minX; x <= maxX; x++)
+        {
+            for (int z = minZ; z <= maxZ; z++)
+            {
+                if (platformCells[x, z])
+                {
+                    continue;
+                }
+
+                float centerY = -floorThickness * 0.5f;
+                GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                tile.name = $"SpawnPlatform_{x}_{z}";
+                tile.transform.SetParent(generatedRoot);
+                tile.transform.position = CellToWorld(x, z, centerY, width, depth);
+                tile.transform.localScale = new Vector3(cellSize * 0.9f, floorThickness, cellSize * 0.9f);
+                ApplyGroundLayer(tile);
+                tile.GetComponent<Renderer>().material = floorMaterial;
+
+                platformCells[x, z] = true;
+                platformTopHeights[x, z] = 0f;
+            }
+        }
     }
 
     private void BuildCeiling(int width, int depth)
@@ -735,6 +875,7 @@ public class RandomMapGenerator : MonoBehaviour
                 Vector3 scale = new Vector3(cellSize * 0.72f, stepHeight, cellSize * 0.72f);
                 CreateBlock($"Staircase_{floor}_{x}_{z}", worldPosition, scale, coverMaterial);
                 coverCells[x, z] = true;
+                RegisterPlatformCellHeight(x, z, stepHeight);
                 MarkStairShaftCell(x, z, width, depth);
 
                 lastX = x;
@@ -754,10 +895,29 @@ public class RandomMapGenerator : MonoBehaviour
                     Vector3 scale = new Vector3(cellSize * 0.8f, platformHeight, cellSize * 0.8f);
                     CreateBlock($"Landing_{floor}_{landingX}_{landingZ}", worldPosition, scale, coverMaterial);
                     coverCells[landingX, landingZ] = true;
+                    RegisterPlatformCellHeight(landingX, landingZ, platformHeight);
                     MarkStairShaftCell(landingX, landingZ, width, depth);
                 }
             }
         }
+    }
+
+    private void RegisterPlatformCellHeight(int x, int z, float topY)
+    {
+        if (platformCells == null || platformTopHeights == null)
+        {
+            return;
+        }
+
+        int width = platformCells.GetLength(0);
+        int depth = platformCells.GetLength(1);
+        if (x < 0 || z < 0 || x >= width || z >= depth)
+        {
+            return;
+        }
+
+        platformCells[x, z] = true;
+        platformTopHeights[x, z] = Mathf.Max(platformTopHeights[x, z], topY);
     }
 
     private void MarkStairShaftCell(int x, int z, int width, int depth)
@@ -815,6 +975,7 @@ public class RandomMapGenerator : MonoBehaviour
             Vector3 scale = new Vector3(cellSize * 0.7f, stepHeight, cellSize * 0.7f);
             CreateBlock($"ParkourStep_{x}_{z}", worldPosition, scale, coverMaterial);
             coverCells[x, z] = true;
+            RegisterPlatformCellHeight(x, z, stepHeight);
         }
     }
 
@@ -841,6 +1002,7 @@ public class RandomMapGenerator : MonoBehaviour
                 Vector3 scale = new Vector3(cellSize * 0.85f, tallPlatformHeight, cellSize * 0.85f);
                 CreateBlock($"TallPlatform_{x}_{z}", worldPosition, scale, coverMaterial);
                 coverCells[x, z] = true;
+                RegisterPlatformCellHeight(x, z, tallPlatformHeight);
             }
         }
 
@@ -865,6 +1027,7 @@ public class RandomMapGenerator : MonoBehaviour
             Vector3 scale = new Vector3(cellSize * 0.7f, stepHeight, cellSize * 0.7f);
             CreateBlock($"TallStair_{x}_{stairZ}", worldPosition, scale, coverMaterial);
             coverCells[x, stairZ] = true;
+            RegisterPlatformCellHeight(x, stairZ, stepHeight);
         }
     }
 
@@ -954,12 +1117,12 @@ public class RandomMapGenerator : MonoBehaviour
             int x = UnityEngine.Random.Range(room.MinX + 1, room.MaxX);
             int z = UnityEngine.Random.Range(room.MinZ + 1, room.MaxZ);
 
-            if (wallCells[x, z] || coverCells[x, z])
+            if (wallCells[x, z] || coverCells[x, z] || !HasPlatformCell(x, z))
             {
                 continue;
             }
 
-            Vector3 worldPosition = CellToWorld(x, z, 0f, width, depth);
+            Vector3 worldPosition = CellToWorld(x, z, GetPlatformTopY(x, z), width, depth);
             EnemyVariant variant = PickVariant();
             GameObject enemy = CreateEnemy(variant, worldPosition, spawned, false);
             encounter.AddEnemy(enemy);
@@ -1179,12 +1342,86 @@ public class RandomMapGenerator : MonoBehaviour
 
     private void QueuePlayerSpawn(Room spawnRoom, int width, int depth)
     {
-        float floorTopY = transform.position.y;
-        Vector3 basePosition = CellToWorld(spawnRoom.CenterX, spawnRoom.CenterZ, floorTopY, width, depth);
+        int spawnX = spawnRoom.CenterX;
+        int spawnZ = spawnRoom.CenterZ;
+        if (HasPlatformCell(spawnX, spawnZ))
+        {
+            Vector3 centerBase = CellToWorld(spawnX, spawnZ, GetPlatformTopY(spawnX, spawnZ), width, depth);
+            pendingSpawnBase = centerBase;
+        }
+        else if (TryFindPlatformInRoom(spawnRoom, out int foundX, out int foundZ))
+        {
+            pendingSpawnBase = CellToWorld(foundX, foundZ, GetPlatformTopY(foundX, foundZ), width, depth);
+        }
+        else
+        {
+            pendingSpawnBase = CellToWorld(spawnRoom.CenterX, spawnRoom.CenterZ, transform.position.y, width, depth);
+        }
 
-        pendingSpawnBase = basePosition;
         pendingSpawnAttempts = 0;
-        hasPendingPlayerSpawn = !TryPositionPlayerAtSpawn(basePosition);
+        hasPendingPlayerSpawn = !TryPositionPlayerAtSpawn(pendingSpawnBase);
+    }
+
+    private bool HasPlatformCell(int x, int z)
+    {
+        if (platformCells == null)
+        {
+            return true;
+        }
+
+        int width = platformCells.GetLength(0);
+        int depth = platformCells.GetLength(1);
+        if (x < 0 || z < 0 || x >= width || z >= depth)
+        {
+            return false;
+        }
+
+        return platformCells[x, z];
+    }
+
+    private float GetPlatformTopY(int x, int z)
+    {
+        if (platformTopHeights == null)
+        {
+            return transform.position.y;
+        }
+
+        int width = platformTopHeights.GetLength(0);
+        int depth = platformTopHeights.GetLength(1);
+        if (x < 0 || z < 0 || x >= width || z >= depth)
+        {
+            return transform.position.y;
+        }
+
+        return platformTopHeights[x, z];
+    }
+
+    private bool TryFindPlatformInRoom(Room room, out int foundX, out int foundZ)
+    {
+        int bestDistance = int.MaxValue;
+        foundX = room.CenterX;
+        foundZ = room.CenterZ;
+
+        for (int x = room.MinX + 1; x < room.MaxX; x++)
+        {
+            for (int z = room.MinZ + 1; z < room.MaxZ; z++)
+            {
+                if (!HasPlatformCell(x, z))
+                {
+                    continue;
+                }
+
+                int distance = Mathf.Abs(x - room.CenterX) + Mathf.Abs(z - room.CenterZ);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    foundX = x;
+                    foundZ = z;
+                }
+            }
+        }
+
+        return bestDistance != int.MaxValue;
     }
 
     private bool TryPositionPlayerAtSpawn(Vector3 spawnBase)
