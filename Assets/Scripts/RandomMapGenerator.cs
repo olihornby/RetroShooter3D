@@ -94,6 +94,7 @@ public partial class RandomMapGenerator : MonoBehaviour
     private int pendingSpawnAttempts;
     private const int MaxSpawnAttempts = 180;
     private HashSet<Vector2Int> staircaseShaftCells = new HashSet<Vector2Int>();
+    private HashSet<Vector2Int> staircaseFloorHoleCells = new HashSet<Vector2Int>();
     private bool[,] platformCells;
     private float[,] platformTopHeights;
     private readonly Dictionary<int, RoomArchetype> roomArchetypes = new Dictionary<int, RoomArchetype>();
@@ -203,6 +204,7 @@ public partial class RandomMapGenerator : MonoBehaviour
     public void GenerateMap()
     {
         staircaseShaftCells.Clear();
+        staircaseFloorHoleCells.Clear();
 
         PrepareRandom();
         PrepareMaterials();
@@ -214,6 +216,7 @@ public partial class RandomMapGenerator : MonoBehaviour
         bool[,] wallCells = CreateRoomBasedWallLayout(out rooms);
         Room spawnRoom = rooms[0];
         BuildRoomArchetypePlan(rooms, spawnRoom);
+        BuildStairHolePlan(rooms);
         bool[,] coverCells = CreateCoverLayout(wallCells, spawnRoom, rooms);
 
         int width = wallCells.GetLength(0);
@@ -743,6 +746,11 @@ public partial class RandomMapGenerator : MonoBehaviour
                     continue;
                 }
 
+                if (floorIndex > 0 && staircaseFloorHoleCells.Contains(new Vector2Int(x, z)))
+                {
+                    continue;
+                }
+
                 float topY = floorYOffset + level * platformLevelHeight;
                 float centerY = topY - floorThickness * 0.5f;
                 int roomIndex = roomIndexByCell[x, z];
@@ -768,6 +776,42 @@ public partial class RandomMapGenerator : MonoBehaviour
                 {
                     platformCells[x, z] = true;
                     platformTopHeights[x, z] = topY;
+                }
+            }
+        }
+    }
+
+    private void BuildStairHolePlan(List<Room> rooms)
+    {
+        for (int roomIndex = 1; roomIndex < rooms.Count; roomIndex++)
+        {
+            if (!roomArchetypes.TryGetValue(roomIndex, out RoomArchetype archetype) || archetype != RoomArchetype.Staircase)
+            {
+                continue;
+            }
+
+            Room room = rooms[roomIndex];
+            bool alongX = room.Width >= room.Depth;
+
+            int minPrimary = alongX ? room.MinX + 2 : room.MinZ + 2;
+            int maxPrimary = alongX ? room.MaxX - 2 : room.MaxZ - 2;
+            int lane = alongX ? room.CenterZ : room.CenterX;
+
+            for (int primary = minPrimary; primary <= maxPrimary; primary++)
+            {
+                for (int lateralOffset = -1; lateralOffset <= 1; lateralOffset++)
+                {
+                    int x = alongX ? primary : lane + lateralOffset;
+                    int z = alongX ? lane + lateralOffset : primary;
+
+                    if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
+                    {
+                        continue;
+                    }
+
+                    Vector2Int cell = new Vector2Int(x, z);
+                    staircaseFloorHoleCells.Add(cell);
+                    staircaseShaftCells.Add(cell);
                 }
             }
         }
