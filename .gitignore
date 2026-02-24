@@ -63,6 +63,9 @@ Assets/Scripts/DamageableTarget.cs.meta
 Assets/Scripts/WeaponController.cs.meta
 Assets/Scripts/Projectile.cs.meta
 
+# Project-specific ignored model meta files
+*Pistol*.fbx.meta
+
 # OS generated files
 .DS_Store
 .DS_Store?

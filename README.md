@@ -36,18 +36,25 @@ Since this is a script-only project, you'll need to set up the scene in Unity:
    - Move Main Camera as child of CameraHolder
    - Set Camera local position to (0, 0, 0)
 
-3. **Create Ground:**
+3. **Optional: Use a Real 3D Pistol Model:**
+   - Import your pistol model (`.fbx`, `.obj`, etc.) into `Assets/`
+   - Drag it into the scene once and create a prefab from it
+   - Select Player → `WeaponController`
+   - Assign the prefab to **Pistol Model Prefab**
+   - Tweak **Pistol Local Position / Rotation / Scale** so it lines up in first-person view
+
+4. **Create Ground:**
    - Create 3D Object → Plane
    - Position: (0, 0, 0)
    - Scale: (5, 1, 5)
    - Set Layer to "Ground" (create if needed)
 
-4. **Configure Ground Layer:**
+5. **Configure Ground Layer:**
    - Edit → Project Settings → Tags and Layers
    - Add "Ground" layer if not present
    - In Player Controller inspector, set "Ground Mask" to "Ground" layer
 
-5. **Create a Simple Target:**
+6. **Create a Simple Target:**
    - In Hierarchy, right-click → 3D Object → Cube
    - Rename it to "TargetDummy"
    - Position it in front of player, e.g. (0, 1, 10)
@@ -106,7 +113,8 @@ Adds a basic first-person weapon with visible projectile shooting.
 - Left-click firing (`Fire1` input)
 - Fire-rate limit
 - Adjustable projectile speed, lifetime, and damage
-- Procedural 8-bit style weapon model
+- Supports imported pistol model prefab with transform offsets
+- Fallback procedural 8-bit style weapon model
 - Grey projectile visuals
 
 ### Projectile.cs

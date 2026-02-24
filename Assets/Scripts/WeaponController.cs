@@ -16,6 +16,12 @@ public class WeaponController : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform cameraTransform;
 
+    [Header("Model")]
+    [SerializeField] private GameObject pistolModelPrefab;
+    [SerializeField] private Vector3 pistolLocalPosition = new Vector3(0.3f, -0.25f, 0.6f);
+    [SerializeField] private Vector3 pistolLocalRotation = new Vector3(5f, 180f, 0f);
+    [SerializeField] private Vector3 pistolLocalScale = Vector3.one;
+
     [Header("Visuals")]
     [SerializeField] private bool generateWeaponModel = true;
     [SerializeField] private Color weaponPrimaryColor = new Color(0.15f, 0.15f, 0.15f);
@@ -37,7 +43,7 @@ public class WeaponController : MonoBehaviour
 
         if (generateWeaponModel && cameraTransform != null)
         {
-            GenerateWeaponModel();
+            SetupWeaponModel();
         }
     }
 
@@ -112,6 +118,73 @@ public class WeaponController : MonoBehaviour
         }
     }
 
+    private void SetupWeaponModel()
+    {
+        if (cameraTransform == null)
+        {
+            return;
+        }
+
+        Transform existingModel = cameraTransform.Find("WeaponModel");
+        if (existingModel != null)
+        {
+            return;
+        }
+
+        if (pistolModelPrefab != null)
+        {
+            GameObject modelInstance = Instantiate(pistolModelPrefab, cameraTransform);
+            modelInstance.name = "WeaponModel";
+            modelInstance.SetActive(true);
+            modelInstance.transform.localPosition = pistolLocalPosition;
+            modelInstance.transform.localRotation = Quaternion.Euler(pistolLocalRotation);
+            modelInstance.transform.localScale = pistolLocalScale;
+
+            EnsureModelIsVisible(modelInstance.transform);
+
+            Collider[] colliders = modelInstance.GetComponentsInChildren<Collider>(true);
+            foreach (Collider currentCollider in colliders)
+            {
+                Destroy(currentCollider);
+            }
+
+            return;
+        }
+
+        GenerateWeaponModel();
+    }
+
+    private void EnsureModelIsVisible(Transform modelRoot)
+    {
+        Renderer[] renderers = modelRoot.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            Debug.LogWarning("Assigned pistol prefab has no Renderer. Falling back to generated weapon model.");
+            Destroy(modelRoot.gameObject);
+            GenerateWeaponModel();
+            return;
+        }
+
+        foreach (Renderer currentRenderer in renderers)
+        {
+            currentRenderer.enabled = true;
+        }
+
+        Bounds combinedBounds = renderers[0].bounds;
+        for (int index = 1; index < renderers.Length; index++)
+        {
+            combinedBounds.Encapsulate(renderers[index].bounds);
+        }
+
+        float largestDimension = Mathf.Max(combinedBounds.size.x, combinedBounds.size.y, combinedBounds.size.z);
+        if (largestDimension < 0.02f || largestDimension > 2.5f)
+        {
+            float targetSize = 0.35f;
+            float scaleFactor = targetSize / Mathf.Max(largestDimension, 0.0001f);
+            modelRoot.localScale *= scaleFactor;
+        }
+    }
+
     private void GenerateWeaponModel()
     {
         Transform existingModel = cameraTransform.Find("WeaponModel");
@@ -122,8 +195,9 @@ public class WeaponController : MonoBehaviour
 
         GameObject modelRoot = new GameObject("WeaponModel");
         modelRoot.transform.SetParent(cameraTransform);
-        modelRoot.transform.localPosition = new Vector3(0.3f, -0.25f, 0.6f);
-        modelRoot.transform.localRotation = Quaternion.Euler(5f, 180f, 0f);
+        modelRoot.transform.localPosition = pistolLocalPosition;
+        modelRoot.transform.localRotation = Quaternion.Euler(pistolLocalRotation);
+        modelRoot.transform.localScale = pistolLocalScale;
 
         CreateWeaponPart(
             "Body",
