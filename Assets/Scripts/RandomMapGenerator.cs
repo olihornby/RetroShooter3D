@@ -345,8 +345,8 @@ public class RandomMapGenerator : MonoBehaviour
         CarveRoom(cells, spawnRoom);
         rooms.Add(spawnRoom);
 
-        int targetRooms = Mathf.Max(6, desiredRoomCount);
-        int attempts = targetRooms * 24;
+        int targetRooms = Mathf.Clamp(Mathf.Max(12, desiredRoomCount), 12, 36);
+        int attempts = targetRooms * 80;
 
         for (int attempt = 0; attempt < attempts && rooms.Count < targetRooms; attempt++)
         {
@@ -360,7 +360,7 @@ public class RandomMapGenerator : MonoBehaviour
             bool overlaps = false;
             for (int index = 0; index < rooms.Count; index++)
             {
-                if (candidate.Intersects(rooms[index], 2))
+                if (candidate.Intersects(rooms[index], 1))
                 {
                     overlaps = true;
                     break;
@@ -667,25 +667,50 @@ public class RandomMapGenerator : MonoBehaviour
 
     private void BuildStaircaseRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
     {
-        int floors = Mathf.Clamp(maxFloors, 2, 8);
-        int stepsPerFloor = Mathf.Clamp(stairStepsPerFloor, 3, 8);
-
         bool alongX = room.Width >= room.Depth;
-        int baseX = alongX ? room.MinX + 1 : room.CenterX;
-        int baseZ = alongX ? room.CenterZ : room.MinZ + 1;
-        int direction = UnityEngine.Random.value < 0.5f ? 1 : -1;
+
+        int laneCapacity = alongX ? room.Depth - 2 : room.Width - 2;
+        if (laneCapacity < 2)
+        {
+            return;
+        }
+
+        int floors = Mathf.Clamp(maxFloors, 3, 8);
+        floors = Mathf.Clamp(Mathf.Min(floors, laneCapacity), 2, 8);
+
+        int primaryRun = alongX ? room.Width - 2 : room.Depth - 2;
+        int stepsPerFloor = Mathf.Clamp(stairStepsPerFloor, 4, 8);
+        stepsPerFloor = Mathf.Clamp(Mathf.Min(stepsPerFloor, primaryRun), 3, 8);
+
+        int minPrimary = alongX ? room.MinX + 1 : room.MinZ + 1;
+        int maxPrimary = alongX ? room.MaxX - 1 : room.MaxZ - 1;
+        int minLane = alongX ? room.MinZ + 1 : room.MinX + 1;
+
+        int laneDirection = UnityEngine.Random.value < 0.5f ? 1 : -1;
+        int laneStart = laneDirection > 0 ? minLane : minLane + floors - 1;
 
         for (int floor = 1; floor < floors; floor++)
         {
             float levelHeight = floorLevelHeight * floor;
+            int lane = laneStart + (floor - 1) * laneDirection;
+            bool forward = floor % 2 == 1;
+
+            int lastX = alongX ? (forward ? maxPrimary : minPrimary) : lane;
+            int lastZ = alongX ? lane : (forward ? maxPrimary : minPrimary);
+
             for (int step = 0; step < stepsPerFloor; step++)
             {
-                int x = alongX ? baseX + (step + (floor - 1) * (stepsPerFloor + 1)) * direction : baseX;
-                int z = alongX ? baseZ : baseZ + (step + (floor - 1) * (stepsPerFloor + 1)) * direction;
+                float t = (step + 1f) / stepsPerFloor;
+                int primary = forward
+                    ? Mathf.RoundToInt(Mathf.Lerp(minPrimary, maxPrimary, t))
+                    : Mathf.RoundToInt(Mathf.Lerp(maxPrimary, minPrimary, t));
+
+                int x = alongX ? primary : lane;
+                int z = alongX ? lane : primary;
 
                 if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
                 {
-                    break;
+                    continue;
                 }
 
                 if (wallCells[x, z])
@@ -693,39 +718,33 @@ public class RandomMapGenerator : MonoBehaviour
                     continue;
                 }
 
-                float stepHeight = Mathf.Lerp(levelHeight - floorLevelHeight + 0.6f, levelHeight, (step + 1f) / stepsPerFloor);
+                float stepHeight = Mathf.Lerp(levelHeight - floorLevelHeight + 0.6f, levelHeight, t);
                 stepHeight = Mathf.Clamp(stepHeight, 0.6f, wallHeight - 1f);
 
                 Vector3 worldPosition = CellToWorld(x, z, stepHeight * 0.5f, width, depth);
                 Vector3 scale = new Vector3(cellSize * 0.72f, stepHeight, cellSize * 0.72f);
-                CreateBlock($"Staircase_{x}_{z}", worldPosition, scale, coverMaterial);
+                CreateBlock($"Staircase_{floor}_{x}_{z}", worldPosition, scale, coverMaterial);
                 coverCells[x, z] = true;
                 MarkStairShaftCell(x, z, width, depth);
+
+                lastX = x;
+                lastZ = z;
             }
 
-            int platformRadius = 1;
-            int platformCenterX = room.CenterX + (alongX ? direction * Mathf.Min(floor, 2) : 0);
-            int platformCenterZ = room.CenterZ + (alongX ? 0 : direction * Mathf.Min(floor, 2));
-            for (int px = platformCenterX - platformRadius; px <= platformCenterX + platformRadius; px++)
+            int nextLane = lane + laneDirection;
+            if (nextLane > minLane - 1 && nextLane < minLane + laneCapacity)
             {
-                for (int pz = platformCenterZ - platformRadius; pz <= platformCenterZ + platformRadius; pz++)
+                int landingX = alongX ? lastX : nextLane;
+                int landingZ = alongX ? nextLane : lastZ;
+
+                if (landingX > room.MinX && landingX < room.MaxX && landingZ > room.MinZ && landingZ < room.MaxZ && !wallCells[landingX, landingZ])
                 {
-                    if (px <= room.MinX || px >= room.MaxX || pz <= room.MinZ || pz >= room.MaxZ)
-                    {
-                        continue;
-                    }
-
-                    if (wallCells[px, pz])
-                    {
-                        continue;
-                    }
-
                     float platformHeight = Mathf.Clamp(levelHeight, 0.8f, wallHeight - 0.8f);
-                    Vector3 worldPosition = CellToWorld(px, pz, platformHeight * 0.5f, width, depth);
-                    Vector3 scale = new Vector3(cellSize * 0.85f, platformHeight, cellSize * 0.85f);
-                    CreateBlock($"Landing_{px}_{pz}", worldPosition, scale, coverMaterial);
-                    coverCells[px, pz] = true;
-                    MarkStairShaftCell(px, pz, width, depth);
+                    Vector3 worldPosition = CellToWorld(landingX, landingZ, platformHeight * 0.5f, width, depth);
+                    Vector3 scale = new Vector3(cellSize * 0.8f, platformHeight, cellSize * 0.8f);
+                    CreateBlock($"Landing_{floor}_{landingX}_{landingZ}", worldPosition, scale, coverMaterial);
+                    coverCells[landingX, landingZ] = true;
+                    MarkStairShaftCell(landingX, landingZ, width, depth);
                 }
             }
         }
