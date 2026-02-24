@@ -9,26 +9,28 @@ using UnityEngine;
 public class RandomMapGenerator : MonoBehaviour
 {
     [Header("Map Size")]
-    [SerializeField] private int mapWidth = 48;
-    [SerializeField] private int mapDepth = 48;
+    [SerializeField] private int mapWidth = 64;
+    [SerializeField] private int mapDepth = 64;
     [SerializeField] private float cellSize = 2f;
 
     [Header("Generation")]
     [SerializeField] private bool generateOnStart = true;
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 12345;
-    [SerializeField, Range(6, 36)] private int desiredRoomCount = 16;
-    [SerializeField, Range(4, 14)] private int minRoomSize = 5;
-    [SerializeField, Range(5, 18)] private int maxRoomSize = 10;
+    [SerializeField, Range(6, 36)] private int desiredRoomCount = 14;
+    [SerializeField, Range(4, 20)] private int minRoomSize = 9;
+    [SerializeField, Range(5, 24)] private int maxRoomSize = 16;
     [SerializeField, Range(1, 4)] private int corridorWidth = 2;
-    [SerializeField] private int spawnClearRadius = 4;
-    [SerializeField, Range(0f, 0.4f)] private float coverChance = 0.08f;
+    [SerializeField] private int spawnClearRadius = 5;
+    [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.2f;
 
     [Header("Block Settings")]
     [SerializeField] private float floorThickness = 0.5f;
     [SerializeField] private float wallHeight = 3f;
     [SerializeField] private float ceilingThickness = 0.4f;
     [SerializeField] private float coverHeight = 1.2f;
+    [SerializeField] private float floorBoxHeight = 0.7f;
+    [SerializeField, Range(0f, 0.5f)] private float floorBoxChance = 0.24f;
 
     [Header("Room Encounters")]
     [SerializeField] private bool spawnEnemies = true;
@@ -455,7 +457,13 @@ public class RandomMapGenerator : MonoBehaviour
                     continue;
                 }
 
-                coverCells[x, z] = UnityEngine.Random.value < coverChance;
+                float chance = coverChance;
+                if (openNeighbors >= 3)
+                {
+                    chance += floorBoxChance * 0.35f;
+                }
+
+                coverCells[x, z] = UnityEngine.Random.value < chance;
             }
         }
 
@@ -524,8 +532,11 @@ public class RandomMapGenerator : MonoBehaviour
                     continue;
                 }
 
-                Vector3 worldPosition = CellToWorld(x, z, coverHeight * 0.5f, width, depth);
-                Vector3 scale = new Vector3(cellSize * 0.85f, coverHeight, cellSize * 0.85f);
+                bool lowFloorBox = UnityEngine.Random.value < floorBoxChance;
+                float currentHeight = lowFloorBox ? floorBoxHeight : coverHeight;
+                Vector3 worldPosition = CellToWorld(x, z, currentHeight * 0.5f, width, depth);
+                float footprint = lowFloorBox ? 0.7f : 0.85f;
+                Vector3 scale = new Vector3(cellSize * footprint, currentHeight, cellSize * footprint);
                 CreateBlock($"Cover_{x}_{z}", worldPosition, scale, coverMaterial);
             }
         }
@@ -707,6 +718,8 @@ public class RandomMapGenerator : MonoBehaviour
             variant.contactDamage,
             variant.attackRange,
             variant.attackCooldown);
+
+        enemyRoot.AddComponent<EnemyHealthBarUI>();
 
         enemyRoot.SetActive(isActive);
         return enemyRoot;

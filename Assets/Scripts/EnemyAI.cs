@@ -140,6 +140,43 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
+        DealDamageToPlayer();
+    }
+
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        if (hit.collider == null)
+        {
+            return;
+        }
+
+        PlayerHealth hitHealth = hit.collider.GetComponentInParent<PlayerHealth>();
+        if (hitHealth == null)
+        {
+            return;
+        }
+
+        if (playerTransform == null)
+        {
+            playerTransform = hitHealth.transform;
+            playerHealth = hitHealth;
+        }
+
+        DealDamageToPlayer();
+    }
+
+    private void DealDamageToPlayer()
+    {
+        if (playerHealth == null)
+        {
+            return;
+        }
+
+        if (Time.time < nextAttackTime)
+        {
+            return;
+        }
+
         playerHealth.TakeDamage(contactDamage);
         nextAttackTime = Time.time + attackCooldown;
     }

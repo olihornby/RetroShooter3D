@@ -10,13 +10,15 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintSpeed = 8f;
+    [SerializeField] private float acceleration = 14f;
     [SerializeField] private float jumpHeight = 2f;
     [SerializeField] private float gravity = -9.81f;
     
     [Header("Look Settings")]
-    [SerializeField] private float mouseSensitivity = 2500f;
-    [SerializeField] private float arrowLookHorizontalSpeed = 120f;
-    [SerializeField] private float arrowLookVerticalSpeed = 80f;
+    [SerializeField] private float mouseSensitivity = 320f;
+    [SerializeField] private float arrowLookHorizontalSpeed = 90f;
+    [SerializeField] private float arrowLookVerticalSpeed = 65f;
+    [SerializeField] private float lookSmoothing = 12f;
     [SerializeField] private Transform cameraTransform;
     
     [Header("Ground Check")]
@@ -26,8 +28,11 @@ public class PlayerController : MonoBehaviour
     
     private CharacterController controller;
     private Vector3 velocity;
+    private Vector3 planarVelocity;
     private bool isGrounded;
     private float xRotation = 0f;
+    private float smoothedLookX;
+    private float smoothedLookY;
     
     private void Start()
     {
@@ -36,6 +41,11 @@ public class PlayerController : MonoBehaviour
         if (GetComponent<PlayerHealth>() == null)
         {
             gameObject.AddComponent<PlayerHealth>();
+        }
+
+        if (GetComponent<PlayerHealthUI>() == null)
+        {
+            gameObject.AddComponent<PlayerHealthUI>();
         }
         
         // Lock cursor to center of screen
@@ -87,7 +97,6 @@ public class PlayerController : MonoBehaviour
             groundCheck = groundCheckObj.transform;
         }
         
-        Debug.Log($"Player forward: {transform.forward}, Camera: {cameraTransform?.name}");
     }
     
     private void Update()
@@ -119,21 +128,17 @@ public class PlayerController : MonoBehaviour
     private void HandleMovement()
     {
         // Get input
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
-        
-        // Debug movement input
-        if (x != 0 || z != 0)
-        {
-            Debug.Log($"Input - X: {x}, Z: {z} | Forward: {transform.forward} | Right: {transform.right}");
-        }
+        float x = Input.GetAxisRaw("Horizontal");
+        float z = Input.GetAxisRaw("Vertical");
         
         // Calculate movement direction relative to player rotation
-        Vector3 move = transform.right * x + transform.forward * z;
+        Vector3 move = (transform.right * x + transform.forward * z).normalized;
         
         // Apply speed
         float currentSpeed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : moveSpeed;
-        controller.Move(move * currentSpeed * Time.deltaTime);
+        Vector3 targetPlanarVelocity = move * currentSpeed;
+        planarVelocity = Vector3.MoveTowards(planarVelocity, targetPlanarVelocity, acceleration * Time.deltaTime);
+        controller.Move(planarVelocity * Time.deltaTime);
         
         // Jump
         if (Input.GetButtonDown("Jump") && isGrounded)
@@ -172,14 +177,18 @@ public class PlayerController : MonoBehaviour
             + keyboardYawInput * arrowLookHorizontalSpeed * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime
             - keyboardPitchInput * arrowLookVerticalSpeed * Time.deltaTime;
+
+        float smoothingFactor = 1f - Mathf.Exp(-lookSmoothing * Time.deltaTime);
+        smoothedLookX = Mathf.Lerp(smoothedLookX, mouseX, smoothingFactor);
+        smoothedLookY = Mathf.Lerp(smoothedLookY, mouseY, smoothingFactor);
         
         // Rotate camera up/down
-        xRotation -= mouseY;
+        xRotation -= smoothedLookY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
         
         cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
         
         // Rotate player left/right
-        transform.Rotate(Vector3.up * mouseX);
+        transform.Rotate(Vector3.up * smoothedLookX);
     }
 }

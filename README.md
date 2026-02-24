@@ -104,11 +104,12 @@ Handles first-person movement, jumping, and camera controls.
 
 **Features:**
 - WASD movement
-- Mouse look with vertical clamping
+- Smoothed mouse look with vertical clamping
 - Arrow-key look support (left/right/up/down)
 - Sprint functionality
 - Jump with ground detection
 - Gravity simulation
+- Reduced input jitter with movement acceleration smoothing
 
 ### VoxelPlayerModel.cs
 Generates a simple voxel-style 8-bit player model at runtime.
@@ -166,7 +167,7 @@ Builds a new random map layout each time Play starts.
 - Much larger default map size
 - Room-and-corridor layout suited for room-clearing gameplay
 - Fully enclosed arena with floor, boundary walls, and ceiling
-- Randomized cover block placement
+- Higher density floor box/cover placement
 - Spawn-safe clear area around player center
 - Configurable seed, room count, and room sizing
 - Room-based enemy wave encounters each run
@@ -195,6 +196,12 @@ Locks room exits and manages wave completion per room.
 
 ### PlayerHealth.cs
 Tracks player health and receives enemy attack damage.
+
+### EnemyHealthBarUI.cs
+Draws a health bar above each enemy.
+
+### PlayerHealthUI.cs
+Draws a top-screen health bar for the player.
 
 ## Next Steps
 
