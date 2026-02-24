@@ -225,6 +225,7 @@ public partial class RandomMapGenerator : MonoBehaviour
 
         BuildPlatformFloor(wallCells, rooms, spawnRoom);
         BuildWalls(wallCells);
+        BuildParkourRoomWalls(rooms, wallCells);
         BuildCover(coverCells, wallCells);
 
         if (enableRoomFeatures)

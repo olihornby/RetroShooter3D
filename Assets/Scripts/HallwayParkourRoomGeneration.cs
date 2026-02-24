@@ -4,11 +4,6 @@ public partial class RandomMapGenerator
 {
     private void ApplyHallwayParkourRoom(Room room, int[,] levels)
     {
-        bool alongX = room.Width >= room.Depth;
-        int laneA = alongX ? room.CenterZ : room.CenterX;
-        int laneB = alongX ? Mathf.Clamp(room.CenterZ + 1, room.MinZ + 1, room.MaxZ - 1) : Mathf.Clamp(room.CenterX + 1, room.MinX + 1, room.MaxX - 1);
-        int high = Mathf.Clamp(maxPlatformLevels / 2 + 1, 1, maxPlatformLevels);
-
         for (int x = room.MinX + 1; x < room.MaxX; x++)
         {
             for (int z = room.MinZ + 1; z < room.MaxZ; z++)
@@ -17,18 +12,53 @@ public partial class RandomMapGenerator
             }
         }
 
-        int from = alongX ? room.MinX + 1 : room.MinZ + 1;
-        int to = alongX ? room.MaxX - 1 : room.MaxZ - 1;
-        for (int p = from; p <= to; p++)
-        {
-            bool alternate = p % 2 == 0;
-            int xA = alongX ? p : laneA;
-            int zA = alongX ? laneA : p;
-            int xB = alongX ? p : laneB;
-            int zB = alongX ? laneB : p;
+        bool alongX = room.Width >= room.Depth;
+        int platformCount = UnityEngine.Random.Range(3, 7);
+        int maxLevel = Mathf.Clamp(Mathf.Max(6, maxPlatformLevels), 3, 8);
 
-            levels[xA, zA] = alternate ? high : 0;
-            levels[xB, zB] = alternate ? 0 : high;
+        System.Collections.Generic.HashSet<int> usedHeights = new System.Collections.Generic.HashSet<int>();
+        System.Collections.Generic.HashSet<Vector2Int> usedCells = new System.Collections.Generic.HashSet<Vector2Int>();
+
+        for (int i = 0; i < platformCount; i++)
+        {
+            int heightLevel = i + 1;
+            if (heightLevel > maxLevel)
+            {
+                heightLevel = maxLevel;
+            }
+
+            if (!usedHeights.Contains(heightLevel))
+            {
+                usedHeights.Add(heightLevel);
+            }
+
+            bool placed = false;
+            for (int attempt = 0; attempt < 40 && !placed; attempt++)
+            {
+                float t = (i + 1f) / (platformCount + 1f);
+                int primary = alongX
+                    ? Mathf.RoundToInt(Mathf.Lerp(room.MinX + 1, room.MaxX - 1, t))
+                    : Mathf.RoundToInt(Mathf.Lerp(room.MinZ + 1, room.MaxZ - 1, t));
+
+                int lateral = alongX
+                    ? UnityEngine.Random.Range(room.MinZ + 1, room.MaxZ)
+                    : UnityEngine.Random.Range(room.MinX + 1, room.MaxX);
+
+                int x = alongX ? primary : lateral;
+                int z = alongX ? lateral : primary;
+                Vector2Int cell = new Vector2Int(x, z);
+
+                if (usedCells.Contains(cell))
+                {
+                    continue;
+                }
+
+                levels[x, z] = heightLevel;
+                usedCells.Add(cell);
+                placed = true;
+            }
         }
+
+        levels[room.CenterX, room.CenterZ] = 1;
     }
 }

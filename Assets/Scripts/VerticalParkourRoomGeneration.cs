@@ -12,25 +12,38 @@ public partial class RandomMapGenerator
             }
         }
 
+        int platformCount = UnityEngine.Random.Range(3, 7);
+        int maxLevel = Mathf.Clamp(Mathf.Max(6, maxPlatformLevels), 3, 8);
         int cx = room.CenterX;
         int cz = room.CenterZ;
-        int maxLevel = Mathf.Clamp(maxPlatformLevels, 2, 8);
 
-        for (int i = 0; i < maxLevel + 2; i++)
+        System.Collections.Generic.HashSet<Vector2Int> usedCells = new System.Collections.Generic.HashSet<Vector2Int>();
+
+        for (int i = 0; i < platformCount; i++)
         {
-            int offsetX = (i % 2 == 0 ? -1 : 1) * (i / 2);
-            int offsetZ = (i % 2 == 0 ? 1 : -1) * (i / 2);
-            int x = Mathf.Clamp(cx + offsetX, room.MinX + 1, room.MaxX - 1);
-            int z = Mathf.Clamp(cz + offsetZ, room.MinZ + 1, room.MaxZ - 1);
-            int level = Mathf.Clamp(i, 0, maxLevel);
-            levels[x, z] = level;
+            bool placed = false;
+            int heightLevel = Mathf.Clamp(i + 1, 1, maxLevel);
 
-            if (x + 1 < room.MaxX)
+            for (int attempt = 0; attempt < 60 && !placed; attempt++)
             {
-                levels[x + 1, z] = Mathf.Max(0, level - 1);
+                int radius = Mathf.Max(1, i + 1);
+                int offsetX = UnityEngine.Random.Range(-radius, radius + 1);
+                int offsetZ = UnityEngine.Random.Range(-radius, radius + 1);
+                int x = Mathf.Clamp(cx + offsetX, room.MinX + 1, room.MaxX - 1);
+                int z = Mathf.Clamp(cz + offsetZ, room.MinZ + 1, room.MaxZ - 1);
+                Vector2Int cell = new Vector2Int(x, z);
+
+                if (usedCells.Contains(cell))
+                {
+                    continue;
+                }
+
+                levels[x, z] = heightLevel;
+                usedCells.Add(cell);
+                placed = true;
             }
         }
 
-        levels[cx, cz] = 0;
+        levels[cx, cz] = 1;
     }
 }
