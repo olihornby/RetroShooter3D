@@ -7,11 +7,12 @@ using UnityEngine;
 public class CrosshairUI : MonoBehaviour
 {
     [SerializeField] private Color crosshairColor = Color.white;
-    [SerializeField] private float size = 14f;
-    [SerializeField] private float thickness = 2f;
+    [SerializeField] private float size = 16f;
+    [SerializeField] private float thickness = 3f;
     [SerializeField] private float gap = 4f;
+    [SerializeField] private float centerDotSize = 4f;
     [SerializeField] private Vector2 ammoTextOffset = new Vector2(0f, 28f);
-    [SerializeField] private int ammoFontSize = 16;
+    [SerializeField] private int ammoFontSize = 18;
 
     private Texture2D pixel;
     private GUIStyle ammoStyle;
@@ -31,10 +32,16 @@ public class CrosshairUI : MonoBehaviour
         };
 
         weaponController = GetComponentInParent<WeaponController>();
+        if (weaponController == null)
+        {
+            weaponController = FindObjectOfType<WeaponController>();
+        }
     }
 
     private void OnGUI()
     {
+        GUI.depth = -1000;
+
         if (pixel == null)
         {
             return;
@@ -50,12 +57,18 @@ public class CrosshairUI : MonoBehaviour
         DrawRect(centerX + gap, centerY - thickness * 0.5f, size, thickness);
         DrawRect(centerX - thickness * 0.5f, centerY - halfSize - gap, thickness, size);
         DrawRect(centerX - thickness * 0.5f, centerY + gap, thickness, size);
+        DrawRect(centerX - centerDotSize * 0.5f, centerY - centerDotSize * 0.5f, centerDotSize, centerDotSize);
 
         DrawAmmo(centerX, centerY);
     }
 
     private void DrawAmmo(float centerX, float centerY)
     {
+        if (weaponController == null)
+        {
+            weaponController = FindObjectOfType<WeaponController>();
+        }
+
         if (weaponController == null)
         {
             return;

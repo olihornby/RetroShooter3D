@@ -40,6 +40,7 @@ public class WeaponController : MonoBehaviour
     private int currentAmmo;
     private bool isReloading;
     private GameObject projectilePrefab;
+    private bool crosshairInitialized;
 
     public int CurrentAmmo => currentAmmo;
     public int MaxAmmo => Mathf.Max(1, magazineSize);
@@ -47,13 +48,7 @@ public class WeaponController : MonoBehaviour
 
     private void Start()
     {
-        if (cameraTransform == null)
-        {
-            if (Camera.main != null)
-            {
-                cameraTransform = Camera.main.transform;
-            }
-        }
+        TryResolveCamera();
 
         if (generateWeaponModel && cameraTransform != null)
         {
@@ -66,6 +61,12 @@ public class WeaponController : MonoBehaviour
 
     private void Update()
     {
+        if (cameraTransform == null)
+        {
+            TryResolveCamera();
+            EnsureCrosshair();
+        }
+
         if (cameraTransform == null)
         {
             return;
@@ -338,6 +339,11 @@ public class WeaponController : MonoBehaviour
 
     private void EnsureCrosshair()
     {
+        if (crosshairInitialized)
+        {
+            return;
+        }
+
         if (cameraTransform == null)
         {
             return;
@@ -347,6 +353,29 @@ public class WeaponController : MonoBehaviour
         if (existingCrosshair == null)
         {
             cameraTransform.gameObject.AddComponent<CrosshairUI>();
+        }
+
+        crosshairInitialized = true;
+    }
+
+    private void TryResolveCamera()
+    {
+        if (cameraTransform != null)
+        {
+            return;
+        }
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            cameraTransform = mainCamera.transform;
+            return;
+        }
+
+        Camera anyCamera = FindObjectOfType<Camera>();
+        if (anyCamera != null)
+        {
+            cameraTransform = anyCamera.transform;
         }
     }
 
