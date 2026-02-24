@@ -912,59 +912,50 @@ public partial class RandomMapGenerator : MonoBehaviour
     private void BuildStaircaseRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
     {
         bool alongX = room.Width >= room.Depth;
-
-        int laneCapacity = alongX ? room.Depth - 2 : room.Width - 2;
-        if (laneCapacity < 2)
+        int availableRun = alongX ? room.Width - 4 : room.Depth - 4;
+        if (availableRun < 4)
         {
             return;
         }
 
-        int floors = Mathf.Clamp(maxFloors, 3, 8);
-        floors = Mathf.Clamp(Mathf.Min(floors, laneCapacity), 2, 8);
+        int stories = Mathf.Max(2, GetStackedFloorCount());
+        int minPrimary = alongX ? room.MinX + 2 : room.MinZ + 2;
+        int maxPrimary = alongX ? room.MaxX - 2 : room.MaxZ - 2;
+        int centerLane = alongX ? room.CenterZ : room.CenterX;
 
-        int primaryRun = alongX ? room.Width - 2 : room.Depth - 2;
-        int stepsPerFloor = Mathf.Clamp(stairStepsPerFloor, 4, 8);
-        stepsPerFloor = Mathf.Clamp(Mathf.Min(stepsPerFloor, primaryRun), 3, 8);
-
-        int minPrimary = alongX ? room.MinX + 1 : room.MinZ + 1;
-        int maxPrimary = alongX ? room.MaxX - 1 : room.MaxZ - 1;
-        int minLane = alongX ? room.MinZ + 1 : room.MinX + 1;
-
-        int laneDirection = UnityEngine.Random.value < 0.5f ? 1 : -1;
-        int laneStart = laneDirection > 0 ? minLane : minLane + floors - 1;
-
-        for (int floor = 1; floor < floors; floor++)
+        for (int story = 0; story < stories - 1; story++)
         {
-            float startHeight = floorLevelHeight * (floor - 1) + 0.35f;
-            float endHeight = floorLevelHeight * floor;
-            int lane = laneStart + (floor - 1) * laneDirection;
-            bool forward = floor % 2 == 1;
+            float startHeight = story * wallHeight;
+            float endHeight = (story + 1) * wallHeight;
+            bool forward = story % 2 == 0;
 
             int runStartPrimary = forward ? minPrimary : maxPrimary;
             int runEndPrimary = forward ? maxPrimary : minPrimary;
 
-            int runStartX = alongX ? runStartPrimary : lane;
-            int runStartZ = alongX ? lane : runStartPrimary;
-            int runEndX = alongX ? runEndPrimary : lane;
-            int runEndZ = alongX ? lane : runEndPrimary;
+            int startX = alongX ? runStartPrimary : centerLane;
+            int startZ = alongX ? centerLane : runStartPrimary;
+            int endX = alongX ? runEndPrimary : centerLane;
+            int endZ = alongX ? centerLane : runEndPrimary;
 
-            if (runStartX <= room.MinX || runStartX >= room.MaxX || runStartZ <= room.MinZ || runStartZ >= room.MaxZ)
+            if (startX <= room.MinX || startX >= room.MaxX || startZ <= room.MinZ || startZ >= room.MaxZ)
             {
                 continue;
             }
 
-            if (runEndX <= room.MinX || runEndX >= room.MaxX || runEndZ <= room.MinZ || runEndZ >= room.MaxZ)
+            if (endX <= room.MinX || endX >= room.MaxX || endZ <= room.MinZ || endZ >= room.MaxZ)
             {
                 continue;
             }
+
+            CreateFlatLandingPanel(story, "Bottom", startX, startZ, startHeight, width, depth, room, wallCells, coverCells);
 
             CreateRampSegment(
-                floor,
-                runStartX,
-                runStartZ,
+                story + 1,
+                startX,
+                startZ,
                 startHeight,
-                runEndX,
-                runEndZ,
+                endX,
+                endZ,
                 endHeight,
                 width,
                 depth,
@@ -972,24 +963,43 @@ public partial class RandomMapGenerator : MonoBehaviour
                 wallCells,
                 coverCells);
 
-            int nextLane = lane + laneDirection;
-            if (nextLane > minLane - 1 && nextLane < minLane + laneCapacity)
-            {
-                int landingX = alongX ? runEndX : nextLane;
-                int landingZ = alongX ? nextLane : runEndZ;
-
-                if (landingX > room.MinX && landingX < room.MaxX && landingZ > room.MinZ && landingZ < room.MaxZ && !wallCells[landingX, landingZ])
-                {
-                    float platformHeight = Mathf.Clamp(endHeight, 0.8f, GetTotalWallHeight() - 0.8f);
-                    Vector3 worldPosition = CellToWorld(landingX, landingZ, platformHeight * 0.5f, width, depth);
-                    Vector3 scale = new Vector3(cellSize * 0.8f, platformHeight, cellSize * 0.8f);
-                    CreateBlock($"Landing_{floor}_{landingX}_{landingZ}", worldPosition, scale, coverMaterial);
-                    coverCells[landingX, landingZ] = true;
-                    RegisterPlatformCellHeight(landingX, landingZ, platformHeight);
-                    MarkStairShaftCell(landingX, landingZ, width, depth);
-                }
-            }
+            CreateFlatLandingPanel(story, "Top", endX, endZ, endHeight, width, depth, room, wallCells, coverCells);
         }
+    }
+
+    private void CreateFlatLandingPanel(
+        int story,
+        string suffix,
+        int x,
+        int z,
+        float topHeight,
+        int width,
+        int depth,
+        Room room,
+        bool[,] wallCells,
+        bool[,] coverCells)
+    {
+        if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
+        {
+            return;
+        }
+
+        if (wallCells[x, z])
+        {
+            return;
+        }
+
+        GameObject panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        panel.name = $"RampLanding_{story}_{suffix}_{x}_{z}";
+        panel.transform.SetParent(generatedRoot);
+        panel.transform.position = CellToWorld(x, z, topHeight - floorThickness * 0.5f, width, depth);
+        panel.transform.localScale = new Vector3(cellSize * 0.95f, floorThickness, cellSize * 0.95f);
+        ApplyGroundLayer(panel);
+        panel.GetComponent<Renderer>().material = floorMaterial;
+
+        coverCells[x, z] = true;
+        RegisterPlatformCellHeight(x, z, topHeight);
+        MarkStairShaftCell(x, z, width, depth);
     }
 
     private void CreateRampSegment(
