@@ -25,6 +25,17 @@ public class Projectile : MonoBehaviour
 
     public void Initialize(float newDamage, float newSpeed, float newLifeTime, LayerMask newHitMask, Transform newOwner)
     {
+        if (body == null)
+        {
+            body = GetComponent<Rigidbody>();
+        }
+
+        if (body == null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         damage = newDamage;
         speed = newSpeed;
         lifeTime = newLifeTime;

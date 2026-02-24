@@ -65,9 +65,17 @@ public class WeaponController : MonoBehaviour
         Vector3 spawnPosition = cameraTransform.position + cameraTransform.forward * 0.6f;
         Quaternion spawnRotation = Quaternion.LookRotation(cameraTransform.forward);
         GameObject projectileInstance = Instantiate(projectilePrefab, spawnPosition, spawnRotation);
+        projectileInstance.SetActive(true);
 
         Projectile projectile = projectileInstance.GetComponent<Projectile>();
-        projectile.Initialize(damage, projectileSpeed, projectileLifetime, hitMask, transform);
+        if (projectile != null)
+        {
+            projectile.Initialize(damage, projectileSpeed, projectileLifetime, hitMask, transform);
+        }
+        else
+        {
+            Destroy(projectileInstance);
+        }
     }
 
     private GameObject CreateRuntimeProjectilePrefab()
