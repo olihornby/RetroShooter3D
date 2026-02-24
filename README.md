@@ -81,6 +81,7 @@ RetroShooter3D/
 │       ├── VoxelPlayerModel.cs      # 8-bit player model generator
 │       ├── WeaponController.cs      # Projectile weapon firing
 │       ├── Projectile.cs            # Projectile movement + impact effects
+│       ├── CrosshairUI.cs           # Center-screen aiming crosshair
 │       └── DamageableTarget.cs      # Basic health/damage receiver
 └── README.md
 ```
@@ -113,9 +114,18 @@ Adds a basic first-person weapon with visible projectile shooting.
 - Left-click firing (`Fire1` input)
 - Fire-rate limit
 - Adjustable projectile speed, lifetime, and damage
+- Projectile spawn from gun muzzle point (not camera center)
 - Supports imported pistol model prefab with transform offsets
 - Fallback procedural 8-bit style weapon model
 - Grey projectile visuals
+
+### CrosshairUI.cs
+Draws a simple center-screen crosshair for aiming.
+
+**Features:**
+- Auto-added to camera by `WeaponController`
+- Lightweight UI using `OnGUI`
+- Adjustable color, size, thickness, and gap
 
 ### Projectile.cs
 Handles projectile movement, collision, damage, and impact VFX.

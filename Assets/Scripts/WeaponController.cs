@@ -15,12 +15,15 @@ public class WeaponController : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private Transform cameraTransform;
+    [SerializeField] private Transform muzzleTransform;
 
     [Header("Model")]
     [SerializeField] private GameObject pistolModelPrefab;
+    [SerializeField] private string muzzlePointName = "MuzzlePoint";
     [SerializeField] private Vector3 pistolLocalPosition = new Vector3(0.3f, -0.25f, 0.6f);
     [SerializeField] private Vector3 pistolLocalRotation = new Vector3(5f, 180f, 0f);
     [SerializeField] private Vector3 pistolLocalScale = Vector3.one;
+    [SerializeField] private Vector3 defaultMuzzleLocalPosition = new Vector3(0f, 0f, -0.35f);
 
     [Header("Visuals")]
     [SerializeField] private bool generateWeaponModel = true;
@@ -45,6 +48,8 @@ public class WeaponController : MonoBehaviour
         {
             SetupWeaponModel();
         }
+
+        EnsureCrosshair();
     }
 
     private void Update()
@@ -68,7 +73,9 @@ public class WeaponController : MonoBehaviour
             projectilePrefab = CreateRuntimeProjectilePrefab();
         }
 
-        Vector3 spawnPosition = cameraTransform.position + cameraTransform.forward * 0.6f;
+        Vector3 spawnPosition = muzzleTransform != null
+            ? muzzleTransform.position
+            : cameraTransform.position + cameraTransform.forward * 0.6f;
         Quaternion spawnRotation = Quaternion.LookRotation(cameraTransform.forward);
         GameObject projectileInstance = Instantiate(projectilePrefab, spawnPosition, spawnRotation);
         projectileInstance.SetActive(true);
@@ -128,6 +135,7 @@ public class WeaponController : MonoBehaviour
         Transform existingModel = cameraTransform.Find("WeaponModel");
         if (existingModel != null)
         {
+            ResolveMuzzlePoint(existingModel);
             return;
         }
 
@@ -147,6 +155,8 @@ public class WeaponController : MonoBehaviour
             {
                 Destroy(currentCollider);
             }
+
+            ResolveMuzzlePoint(modelInstance.transform);
 
             return;
         }
@@ -219,6 +229,43 @@ public class WeaponController : MonoBehaviour
             new Vector3(0f, -0.14f, 0.08f),
             new Vector3(0.1f, 0.22f, 0.14f),
             weaponSecondaryColor);
+
+        ResolveMuzzlePoint(modelRoot.transform);
+    }
+
+    private void ResolveMuzzlePoint(Transform weaponModelRoot)
+    {
+        if (weaponModelRoot == null)
+        {
+            return;
+        }
+
+        Transform existingMuzzle = weaponModelRoot.Find(muzzlePointName);
+        if (existingMuzzle != null)
+        {
+            muzzleTransform = existingMuzzle;
+            return;
+        }
+
+        GameObject muzzleObject = new GameObject(muzzlePointName);
+        muzzleObject.transform.SetParent(weaponModelRoot);
+        muzzleObject.transform.localPosition = defaultMuzzleLocalPosition;
+        muzzleObject.transform.localRotation = Quaternion.identity;
+        muzzleTransform = muzzleObject.transform;
+    }
+
+    private void EnsureCrosshair()
+    {
+        if (cameraTransform == null)
+        {
+            return;
+        }
+
+        CrosshairUI existingCrosshair = cameraTransform.GetComponent<CrosshairUI>();
+        if (existingCrosshair == null)
+        {
+            cameraTransform.gameObject.AddComponent<CrosshairUI>();
+        }
     }
 
     private void CreateWeaponPart(string name, Transform parent, Vector3 localPosition, Vector3 localScale, Color color)
