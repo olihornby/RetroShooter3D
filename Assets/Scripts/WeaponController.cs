@@ -24,6 +24,7 @@ public class WeaponController : MonoBehaviour
     [SerializeField] private Vector3 pistolLocalRotation = new Vector3(5f, 180f, 0f);
     [SerializeField] private Vector3 pistolLocalScale = Vector3.one;
     [SerializeField] private Vector3 defaultMuzzleLocalPosition = new Vector3(0f, 0f, -0.35f);
+    [SerializeField] private float muzzleForwardOffset = 0.06f;
 
     [Header("Visuals")]
     [SerializeField] private bool generateWeaponModel = true;
@@ -73,10 +74,11 @@ public class WeaponController : MonoBehaviour
             projectilePrefab = CreateRuntimeProjectilePrefab();
         }
 
+        Vector3 fireDirection = cameraTransform.forward;
         Vector3 spawnPosition = muzzleTransform != null
-            ? muzzleTransform.position
-            : cameraTransform.position + cameraTransform.forward * 0.6f;
-        Quaternion spawnRotation = Quaternion.LookRotation(cameraTransform.forward);
+            ? muzzleTransform.position + fireDirection * muzzleForwardOffset
+            : cameraTransform.position + fireDirection * 0.6f;
+        Quaternion spawnRotation = Quaternion.LookRotation(fireDirection);
         GameObject projectileInstance = Instantiate(projectilePrefab, spawnPosition, spawnRotation);
         projectileInstance.SetActive(true);
 
@@ -249,9 +251,37 @@ public class WeaponController : MonoBehaviour
 
         GameObject muzzleObject = new GameObject(muzzlePointName);
         muzzleObject.transform.SetParent(weaponModelRoot);
-        muzzleObject.transform.localPosition = defaultMuzzleLocalPosition;
         muzzleObject.transform.localRotation = Quaternion.identity;
+
+        if (!TryPlaceMuzzleFromRenderBounds(weaponModelRoot, muzzleObject.transform))
+        {
+            muzzleObject.transform.localPosition = defaultMuzzleLocalPosition;
+        }
+
         muzzleTransform = muzzleObject.transform;
+    }
+
+    private bool TryPlaceMuzzleFromRenderBounds(Transform weaponModelRoot, Transform muzzle)
+    {
+        Renderer[] renderers = weaponModelRoot.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+        {
+            return false;
+        }
+
+        Bounds combinedBounds = renderers[0].bounds;
+        for (int index = 1; index < renderers.Length; index++)
+        {
+            combinedBounds.Encapsulate(renderers[index].bounds);
+        }
+
+        Vector3 forward = cameraTransform != null ? cameraTransform.forward : weaponModelRoot.forward;
+        float reach = Mathf.Max(combinedBounds.extents.x, combinedBounds.extents.y, combinedBounds.extents.z);
+        Vector3 worldFrontPoint = combinedBounds.center + forward * reach;
+
+        muzzle.position = worldFrontPoint;
+        muzzle.rotation = Quaternion.LookRotation(forward, Vector3.up);
+        return true;
     }
 
     private void EnsureCrosshair()
