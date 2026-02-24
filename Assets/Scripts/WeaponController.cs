@@ -35,12 +35,22 @@ public class WeaponController : MonoBehaviour
     [SerializeField] private Color weaponSecondaryColor = new Color(0.35f, 0.35f, 0.35f);
     [SerializeField] private Color projectileColor = new Color(0.6f, 0.6f, 0.6f);
 
+    [Header("HUD Fallback")]
+    [SerializeField] private bool showFallbackHud = true;
+    [SerializeField] private Color hudColor = Color.white;
+    [SerializeField] private float hudCrosshairSize = 16f;
+    [SerializeField] private float hudCrosshairThickness = 3f;
+    [SerializeField] private float hudCrosshairGap = 4f;
+    [SerializeField] private int hudFontSize = 18;
+
     private float nextTimeToFire;
     private float reloadCompleteTime;
     private int currentAmmo;
     private bool isReloading;
     private GameObject projectilePrefab;
     private bool crosshairInitialized;
+    private Texture2D hudPixel;
+    private GUIStyle hudTextStyle;
 
     public int CurrentAmmo => currentAmmo;
     public int MaxAmmo => Mathf.Max(1, magazineSize);
@@ -57,6 +67,7 @@ public class WeaponController : MonoBehaviour
 
         EnsureCrosshair();
         currentAmmo = Mathf.Max(1, magazineSize);
+        CreateHudResources();
     }
 
     private void Update()
@@ -176,6 +187,74 @@ public class WeaponController : MonoBehaviour
         {
             Destroy(projectilePrefab);
         }
+
+        if (hudPixel != null)
+        {
+            Destroy(hudPixel);
+        }
+    }
+
+    private void OnGUI()
+    {
+        if (!showFallbackHud)
+        {
+            return;
+        }
+
+        if (hudPixel == null)
+        {
+            CreateHudResources();
+            if (hudPixel == null)
+            {
+                return;
+            }
+        }
+
+        GUI.depth = -1000;
+        GUI.color = hudColor;
+
+        float centerX = Screen.width * 0.5f;
+        float centerY = Screen.height * 0.5f;
+        float halfSize = hudCrosshairSize * 0.5f;
+
+        DrawHudRect(centerX - halfSize - hudCrosshairGap, centerY - hudCrosshairThickness * 0.5f, hudCrosshairSize, hudCrosshairThickness);
+        DrawHudRect(centerX + hudCrosshairGap, centerY - hudCrosshairThickness * 0.5f, hudCrosshairSize, hudCrosshairThickness);
+        DrawHudRect(centerX - hudCrosshairThickness * 0.5f, centerY - halfSize - hudCrosshairGap, hudCrosshairThickness, hudCrosshairSize);
+        DrawHudRect(centerX - hudCrosshairThickness * 0.5f, centerY + hudCrosshairGap, hudCrosshairThickness, hudCrosshairSize);
+        DrawHudRect(centerX - 2f, centerY - 2f, 4f, 4f);
+
+        if (hudTextStyle != null)
+        {
+            hudTextStyle.fontSize = hudFontSize;
+            hudTextStyle.normal.textColor = hudColor;
+            string ammoText = isReloading ? "Reloading..." : $"Ammo: {CurrentAmmo}/{MaxAmmo}";
+            GUI.Label(new Rect(centerX - 120f, centerY + 30f, 240f, 28f), ammoText, hudTextStyle);
+        }
+    }
+
+    private void CreateHudResources()
+    {
+        if (hudPixel == null)
+        {
+            hudPixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            hudPixel.SetPixel(0, 0, Color.white);
+            hudPixel.Apply();
+        }
+
+        if (hudTextStyle == null)
+        {
+            hudTextStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.UpperCenter,
+                fontSize = hudFontSize,
+                normal = { textColor = hudColor }
+            };
+        }
+    }
+
+    private void DrawHudRect(float x, float y, float width, float height)
+    {
+        GUI.DrawTexture(new Rect(x, y, width, height), hudPixel);
     }
 
     private void SetupWeaponModel()
