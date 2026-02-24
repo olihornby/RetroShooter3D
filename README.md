@@ -91,6 +91,8 @@ RetroShooter3D/
 │       ├── CrosshairUI.cs           # Center-screen aiming crosshair
 │       ├── RandomMapGenerator.cs    # Random arena generation each play
 │       ├── EnemyAI.cs               # Vision-based enemy chase behavior
+│       ├── RoomEncounterController.cs # Room lock/unlock wave encounters
+│       ├── PlayerHealth.cs          # Player damage/health handling
 │       └── DamageableTarget.cs      # Basic health/damage receiver
 └── README.md
 ```
@@ -125,6 +127,7 @@ Adds a basic first-person weapon with visible projectile shooting.
 - Fire-rate limit
 - 8-round magazine with reload cooldown when empty
 - Adjustable projectile speed, lifetime, and damage
+- Separate projectile visual size and collision hitbox radius
 - Projectile spawn from gun muzzle point (not camera center)
 - Supports imported pistol model prefab with transform offsets
 - Fallback procedural 8-bit style weapon model
@@ -160,11 +163,15 @@ Adds health and death behavior for shootable targets.
 Builds a new random map layout each time Play starts.
 
 **Features:**
-- Randomized walls and cover blocks
+- Much larger default map size
+- Room-and-corridor layout suited for room-clearing gameplay
+- Fully enclosed arena with floor, boundary walls, and ceiling
+- Randomized cover block placement
 - Spawn-safe clear area around player center
-- Boundary walls to contain gameplay space
-- Configurable seed, map size, and density
-- Random enemy spawn points each run
+- Configurable seed, room count, and room sizing
+- Room-based enemy wave encounters each run
+- Room door barriers lock on entry and unlock when room is cleared
+- Multiple enemy archetypes with different shape, size, speed, health, and damage
 - Auto-assigns generated geometry to `Ground` layer (if present)
 
 ### EnemyAI.cs
@@ -174,7 +181,20 @@ Controls simple enemy behavior using line-of-sight detection.
 - Chases player only when inside vision radius
 - Requires clear line-of-sight to player
 - Stops close to player instead of overlapping
+- Dedicated enemy hurtbox trigger for more reliable projectile hits
+- Deals contact damage to the player with attack cooldown
 - Works with `DamageableTarget` so enemies can be shot and destroyed
+
+### RoomEncounterController.cs
+Locks room exits and manages wave completion per room.
+
+**Features:**
+- Activates enemies when player enters room trigger
+- Enables temporary room barriers during encounter
+- Unlocks room when all encounter enemies are defeated
+
+### PlayerHealth.cs
+Tracks player health and receives enemy attack damage.
 
 ## Next Steps
 

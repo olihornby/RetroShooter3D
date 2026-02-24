@@ -32,6 +32,11 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         controller = GetComponent<CharacterController>();
+
+        if (GetComponent<PlayerHealth>() == null)
+        {
+            gameObject.AddComponent<PlayerHealth>();
+        }
         
         // Lock cursor to center of screen
         Cursor.lockState = CursorLockMode.Locked;

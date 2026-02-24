@@ -97,6 +97,11 @@ public class Projectile : MonoBehaviour
 
     private void HandleImpact(Collider hitCollider, Vector3 hitPoint, Vector3 hitNormal)
     {
+        if (owner != null && (hitCollider.transform == owner || hitCollider.transform.IsChildOf(owner)))
+        {
+            return;
+        }
+
         hasCollided = true;
 
         DamageableTarget target = hitCollider.GetComponentInParent<DamageableTarget>();

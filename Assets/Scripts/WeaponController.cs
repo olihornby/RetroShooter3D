@@ -13,6 +13,8 @@ public class WeaponController : MonoBehaviour
     [SerializeField] private float reloadCooldown = 1.5f;
     [SerializeField] private float projectileSpeed = 55f;
     [SerializeField] private float projectileLifetime = 3f;
+    [SerializeField] private float projectileVisualSize = 0.08f;
+    [SerializeField] private float projectileHitboxRadius = 0.12f;
     [SerializeField] private LayerMask hitMask = ~0;
 
     [Header("References")]
@@ -157,23 +159,31 @@ public class WeaponController : MonoBehaviour
 
     private GameObject CreateRuntimeProjectilePrefab()
     {
-        GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        GameObject projectile = new GameObject("RuntimeProjectile");
         projectile.name = "RuntimeProjectile";
-        projectile.transform.localScale = Vector3.one * 0.08f;
         projectile.SetActive(false);
 
-        Renderer projectileRenderer = projectile.GetComponent<Renderer>();
+        SphereCollider sphereCollider = projectile.AddComponent<SphereCollider>();
+        sphereCollider.radius = Mathf.Max(0.01f, projectileHitboxRadius);
+        sphereCollider.isTrigger = true;
+
+        GameObject projectileVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        projectileVisual.name = "Visual";
+        projectileVisual.transform.SetParent(projectile.transform);
+        projectileVisual.transform.localPosition = Vector3.zero;
+        projectileVisual.transform.localRotation = Quaternion.identity;
+        projectileVisual.transform.localScale = Vector3.one * Mathf.Max(0.01f, projectileVisualSize);
+        Destroy(projectileVisual.GetComponent<Collider>());
+
+        Renderer projectileRenderer = projectileVisual.GetComponent<Renderer>();
         Material material = new Material(Shader.Find("Standard"));
         material.color = projectileColor;
         material.SetFloat("_Glossiness", 0.2f);
         projectileRenderer.material = material;
 
-        SphereCollider sphereCollider = projectile.GetComponent<SphereCollider>();
-        sphereCollider.isTrigger = true;
-
         Rigidbody body = projectile.AddComponent<Rigidbody>();
         body.useGravity = false;
-        body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         body.interpolation = RigidbodyInterpolation.Interpolate;
 
         projectile.AddComponent<Projectile>();

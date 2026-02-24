@@ -11,6 +11,9 @@ public class DamageableTarget : MonoBehaviour
 
     private float currentHealth;
 
+    public float CurrentHealth => currentHealth;
+    public float MaxHealth => maxHealth;
+
     private void Awake()
     {
         currentHealth = maxHealth;
@@ -29,6 +32,12 @@ public class DamageableTarget : MonoBehaviour
         {
             Die();
         }
+    }
+
+    public void ConfigureHealth(float newMaxHealth)
+    {
+        maxHealth = Mathf.Max(1f, newMaxHealth);
+        currentHealth = maxHealth;
     }
 
     private void Die()

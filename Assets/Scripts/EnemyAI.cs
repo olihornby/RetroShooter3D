@@ -10,16 +10,23 @@ public class EnemyAI : MonoBehaviour
     [Header("Movement")]
     [SerializeField] private float moveSpeed = 2.8f;
     [SerializeField] private float gravity = -9.81f;
-    [SerializeField] private float stopDistance = 1.4f;
+    [SerializeField] private float stopDistance = 1.2f;
 
     [Header("Vision")]
     [SerializeField] private float visionRadius = 16f;
     [SerializeField] private float eyeHeight = 1.1f;
     [SerializeField] private LayerMask visionMask = ~0;
 
+    [Header("Combat")]
+    [SerializeField] private float contactDamage = 10f;
+    [SerializeField] private float attackRange = 1.5f;
+    [SerializeField] private float attackCooldown = 0.9f;
+
     private CharacterController controller;
     private Transform playerTransform;
+    private PlayerHealth playerHealth;
     private Vector3 velocity;
+    private float nextAttackTime;
 
     private void Awake()
     {
@@ -55,6 +62,16 @@ public class EnemyAI : MonoBehaviour
         moveSpeed = newMoveSpeed;
         visionRadius = newVisionRadius;
         visionMask = newVisionMask;
+    }
+
+    public void Configure(float newMoveSpeed, float newVisionRadius, LayerMask newVisionMask, float newContactDamage, float newAttackRange, float newAttackCooldown)
+    {
+        moveSpeed = newMoveSpeed;
+        visionRadius = newVisionRadius;
+        visionMask = newVisionMask;
+        contactDamage = newContactDamage;
+        attackRange = newAttackRange;
+        attackCooldown = newAttackCooldown;
     }
 
     private bool CanSeePlayer()
@@ -101,7 +118,30 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
+        TryAttack(distance);
+
         ApplyGravityOnly();
+    }
+
+    private void TryAttack(float flatDistanceToPlayer)
+    {
+        if (playerHealth == null)
+        {
+            return;
+        }
+
+        if (flatDistanceToPlayer > attackRange)
+        {
+            return;
+        }
+
+        if (Time.time < nextAttackTime)
+        {
+            return;
+        }
+
+        playerHealth.TakeDamage(contactDamage);
+        nextAttackTime = Time.time + attackCooldown;
     }
 
     private void ApplyGravityOnly()
@@ -121,6 +161,7 @@ public class EnemyAI : MonoBehaviour
         if (player != null)
         {
             playerTransform = player.transform;
+            playerHealth = player.GetComponent<PlayerHealth>();
             return;
         }
 
@@ -128,6 +169,7 @@ public class EnemyAI : MonoBehaviour
         if (main != null)
         {
             playerTransform = main.transform.root;
+            playerHealth = playerTransform.GetComponent<PlayerHealth>();
         }
     }
 }
