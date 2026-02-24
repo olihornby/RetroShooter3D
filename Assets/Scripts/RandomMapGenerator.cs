@@ -59,6 +59,10 @@ public class RandomMapGenerator : MonoBehaviour
     private Material wallMaterial;
     private Material coverMaterial;
     private int generatedGroundLayer = -1;
+    private bool hasPendingPlayerSpawn;
+    private Vector3 pendingSpawnBase;
+    private int pendingSpawnAttempts;
+    private const int MaxSpawnAttempts = 180;
 
     [Serializable]
     private class EnemyVariant
@@ -141,6 +145,27 @@ public class RandomMapGenerator : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (!hasPendingPlayerSpawn)
+        {
+            return;
+        }
+
+        if (TryPositionPlayerAtSpawn(pendingSpawnBase))
+        {
+            hasPendingPlayerSpawn = false;
+            return;
+        }
+
+        pendingSpawnAttempts++;
+        if (pendingSpawnAttempts >= MaxSpawnAttempts)
+        {
+            hasPendingPlayerSpawn = false;
+            Debug.LogWarning("Auto player spawn timed out: PlayerController was not found in time.");
+        }
+    }
+
     public void GenerateMap()
     {
         PrepareRandom();
@@ -164,7 +189,7 @@ public class RandomMapGenerator : MonoBehaviour
 
         if (autoPositionPlayer)
         {
-            PositionPlayerAtSpawn(spawnRoom, width, depth);
+            QueuePlayerSpawn(spawnRoom, width, depth);
         }
 
         if (spawnEnemies)
@@ -786,12 +811,22 @@ public class RandomMapGenerator : MonoBehaviour
         }
     }
 
-    private void PositionPlayerAtSpawn(Room spawnRoom, int width, int depth)
+    private void QueuePlayerSpawn(Room spawnRoom, int width, int depth)
+    {
+        float floorTopY = transform.position.y;
+        Vector3 basePosition = CellToWorld(spawnRoom.CenterX, spawnRoom.CenterZ, floorTopY, width, depth);
+
+        pendingSpawnBase = basePosition;
+        pendingSpawnAttempts = 0;
+        hasPendingPlayerSpawn = !TryPositionPlayerAtSpawn(basePosition);
+    }
+
+    private bool TryPositionPlayerAtSpawn(Vector3 spawnBase)
     {
         PlayerController player = FindObjectOfType<PlayerController>();
         if (player == null)
         {
-            return;
+            return false;
         }
 
         CharacterController controller = player.GetComponent<CharacterController>();
@@ -802,12 +837,15 @@ public class RandomMapGenerator : MonoBehaviour
             controller.enabled = false;
         }
 
-        Vector3 spawnBase = CellToWorld(spawnRoom.CenterX, spawnRoom.CenterZ, 0f, width, depth);
         float spawnY = fallbackPlayerSpawnHeight;
 
         if (controller != null)
         {
-            spawnY = controller.height * 0.5f;
+            spawnY = spawnBase.y + controller.height * 0.5f + 0.05f;
+        }
+        else
+        {
+            spawnY = spawnBase.y + fallbackPlayerSpawnHeight;
         }
 
         player.transform.position = new Vector3(spawnBase.x, spawnY, spawnBase.z);
@@ -816,6 +854,8 @@ public class RandomMapGenerator : MonoBehaviour
         {
             controller.enabled = wasControllerEnabled;
         }
+
+        return true;
     }
 
     private Vector3 CellToWorld(int x, int z, float y, int width, int depth)
