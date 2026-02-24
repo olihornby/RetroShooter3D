@@ -17,6 +17,11 @@ public class PlayerHealth : MonoBehaviour
     private void Awake()
     {
         currentHealth = maxHealth;
+
+        if (GetComponent<PlayerHealthUI>() == null)
+        {
+            gameObject.AddComponent<PlayerHealthUI>();
+        }
     }
 
     public void TakeDamage(float amount)

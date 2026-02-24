@@ -6,12 +6,12 @@ using UnityEngine;
 /// </summary>
 public class PlayerHealthUI : MonoBehaviour
 {
-    [SerializeField] private Vector2 barSize = new Vector2(320f, 20f);
-    [SerializeField] private float topMargin = 12f;
+    [SerializeField] private Vector2 barSize = new Vector2(360f, 24f);
+    [SerializeField] private float topMargin = 10f;
     [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.75f);
     [SerializeField] private Color fillColor = new Color(0.2f, 0.85f, 1f, 0.95f);
     [SerializeField] private Color textColor = Color.white;
-    [SerializeField] private int fontSize = 14;
+    [SerializeField] private int fontSize = 16;
 
     private PlayerHealth playerHealth;
     private Texture2D pixel;
@@ -20,6 +20,10 @@ public class PlayerHealthUI : MonoBehaviour
     private void Awake()
     {
         playerHealth = GetComponent<PlayerHealth>();
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+        }
 
         pixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
         pixel.SetPixel(0, 0, Color.white);
@@ -35,10 +39,17 @@ public class PlayerHealthUI : MonoBehaviour
 
     private void OnGUI()
     {
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+        }
+
         if (playerHealth == null || pixel == null)
         {
             return;
         }
+
+        GUI.depth = -1200;
 
         float normalized = playerHealth.MaxHealth > 0f
             ? Mathf.Clamp01(playerHealth.CurrentHealth / playerHealth.MaxHealth)
@@ -46,6 +57,9 @@ public class PlayerHealthUI : MonoBehaviour
 
         float x = (Screen.width - barSize.x) * 0.5f;
         float y = topMargin;
+
+        GUI.color = Color.black;
+        GUI.DrawTexture(new Rect(x - 2f, y - 2f, barSize.x + 4f, barSize.y + 4f), pixel);
 
         GUI.color = backgroundColor;
         GUI.DrawTexture(new Rect(x, y, barSize.x, barSize.y), pixel);

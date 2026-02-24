@@ -176,7 +176,7 @@ public class PlayerController : MonoBehaviour
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime
             + keyboardYawInput * arrowLookHorizontalSpeed * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime
-            - keyboardPitchInput * arrowLookVerticalSpeed * Time.deltaTime;
+            + keyboardPitchInput * arrowLookVerticalSpeed * Time.deltaTime;
 
         float smoothingFactor = 1f - Mathf.Exp(-lookSmoothing * Time.deltaTime);
         smoothedLookX = Mathf.Lerp(smoothedLookX, mouseX, smoothingFactor);

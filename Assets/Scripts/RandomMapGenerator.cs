@@ -9,28 +9,37 @@ using UnityEngine;
 public class RandomMapGenerator : MonoBehaviour
 {
     [Header("Map Size")]
-    [SerializeField] private int mapWidth = 64;
-    [SerializeField] private int mapDepth = 64;
+    [SerializeField] private int mapWidth = 120;
+    [SerializeField] private int mapDepth = 120;
     [SerializeField] private float cellSize = 2f;
 
     [Header("Generation")]
     [SerializeField] private bool generateOnStart = true;
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 12345;
-    [SerializeField, Range(6, 36)] private int desiredRoomCount = 14;
+    [SerializeField, Range(6, 36)] private int desiredRoomCount = 8;
     [SerializeField, Range(4, 20)] private int minRoomSize = 9;
-    [SerializeField, Range(5, 24)] private int maxRoomSize = 16;
-    [SerializeField, Range(1, 4)] private int corridorWidth = 2;
+    [SerializeField, Range(5, 28)] private int maxRoomSize = 20;
+    [SerializeField, Range(1, 4)] private int corridorWidth = 1;
     [SerializeField] private int spawnClearRadius = 5;
-    [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.2f;
+    [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.07f;
+    [SerializeField, Range(0f, 1f)] private float longCorridorChance = 0.65f;
 
     [Header("Block Settings")]
     [SerializeField] private float floorThickness = 0.5f;
-    [SerializeField] private float wallHeight = 3f;
+    [SerializeField] private float wallHeight = 4.8f;
     [SerializeField] private float ceilingThickness = 0.4f;
     [SerializeField] private float coverHeight = 1.2f;
     [SerializeField] private float floorBoxHeight = 0.7f;
-    [SerializeField, Range(0f, 0.5f)] private float floorBoxChance = 0.24f;
+    [SerializeField, Range(0f, 0.5f)] private float floorBoxChance = 0.08f;
+
+    [Header("Room Features")]
+    [SerializeField] private bool enableRoomFeatures = true;
+    [SerializeField, Range(0f, 1f)] private float parkourRoomChance = 0.45f;
+    [SerializeField, Range(0f, 1f)] private float tallRoomChance = 0.35f;
+    [SerializeField] private float parkourStepHeight = 0.45f;
+    [SerializeField] private int parkourStepCount = 5;
+    [SerializeField] private float tallPlatformHeight = 2.8f;
 
     [Header("Room Encounters")]
     [SerializeField] private bool spawnEnemies = true;
@@ -188,6 +197,11 @@ public class RandomMapGenerator : MonoBehaviour
         BuildCeiling(width, depth);
         BuildWalls(wallCells);
         BuildCover(coverCells, wallCells);
+
+        if (enableRoomFeatures)
+        {
+            BuildRoomFeatures(rooms, spawnRoom, wallCells, coverCells);
+        }
 
         if (autoPositionPlayer)
         {
@@ -395,17 +409,48 @@ public class RandomMapGenerator : MonoBehaviour
     {
         int radius = Mathf.Max(0, width - 1);
 
+        if (UnityEngine.Random.value < longCorridorChance)
+        {
+            int mapWidth = cells.GetLength(0);
+            int mapDepth = cells.GetLength(1);
+            bool routeHorizontalFirst = UnityEngine.Random.value < 0.5f;
+
+            if (routeHorizontalFirst)
+            {
+                int midZ = UnityEngine.Random.Range(2, mapDepth - 2);
+                CarveLine(cells, startX, startZ, startX, midZ, radius);
+                CarveLine(cells, startX, midZ, endX, midZ, radius);
+                CarveLine(cells, endX, midZ, endX, endZ, radius);
+            }
+            else
+            {
+                int midX = UnityEngine.Random.Range(2, mapWidth - 2);
+                CarveLine(cells, startX, startZ, midX, startZ, radius);
+                CarveLine(cells, midX, startZ, midX, endZ, radius);
+                CarveLine(cells, midX, endZ, endX, endZ, radius);
+            }
+
+            return;
+        }
+
+        CarveLine(cells, startX, startZ, endX, startZ, radius);
+        CarveLine(cells, endX, startZ, endX, endZ, radius);
+    }
+
+    private void CarveLine(bool[,] cells, int startX, int startZ, int endX, int endZ, int radius)
+    {
         int x = startX;
+        int z = startZ;
+
         while (x != endX)
         {
-            CarveCircle(cells, x, startZ, radius);
+            CarveCircle(cells, x, z, radius);
             x += x < endX ? 1 : -1;
         }
 
-        int z = startZ;
         while (z != endZ)
         {
-            CarveCircle(cells, endX, z, radius);
+            CarveCircle(cells, x, z, radius);
             z += z < endZ ? 1 : -1;
         }
 
@@ -539,6 +584,144 @@ public class RandomMapGenerator : MonoBehaviour
                 Vector3 scale = new Vector3(cellSize * footprint, currentHeight, cellSize * footprint);
                 CreateBlock($"Cover_{x}_{z}", worldPosition, scale, coverMaterial);
             }
+        }
+    }
+
+    private void BuildRoomFeatures(List<Room> rooms, Room spawnRoom, bool[,] wallCells, bool[,] coverCells)
+    {
+        int width = wallCells.GetLength(0);
+        int depth = wallCells.GetLength(1);
+
+        for (int index = 1; index < rooms.Count; index++)
+        {
+            Room room = rooms[index];
+            if (room.Width < 6 || room.Depth < 6)
+            {
+                continue;
+            }
+
+            float roll = UnityEngine.Random.value;
+            if (roll < parkourRoomChance)
+            {
+                BuildParkourRoom(room, wallCells, coverCells, width, depth);
+            }
+            else if (roll < parkourRoomChance + tallRoomChance)
+            {
+                BuildTallRoom(room, wallCells, coverCells, width, depth);
+            }
+            else
+            {
+                BuildVariedCoverRoom(room, spawnRoom, wallCells, coverCells, width, depth);
+            }
+        }
+    }
+
+    private void BuildParkourRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
+    {
+        bool alongX = room.Width >= room.Depth;
+        int steps = Mathf.Clamp(parkourStepCount, 3, 8);
+
+        int startX = alongX ? room.MinX + 1 : room.CenterX;
+        int startZ = alongX ? room.CenterZ : room.MinZ + 1;
+        int direction = UnityEngine.Random.value < 0.5f ? 1 : -1;
+
+        for (int step = 0; step < steps; step++)
+        {
+            int x = alongX ? startX + step * direction : startX;
+            int z = alongX ? startZ : startZ + step * direction;
+
+            if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
+            {
+                break;
+            }
+
+            if (wallCells[x, z] || coverCells[x, z])
+            {
+                continue;
+            }
+
+            float stepHeight = Mathf.Clamp(coverHeight + step * parkourStepHeight, coverHeight, wallHeight - 0.8f);
+            Vector3 worldPosition = CellToWorld(x, z, stepHeight * 0.5f, width, depth);
+            Vector3 scale = new Vector3(cellSize * 0.7f, stepHeight, cellSize * 0.7f);
+            CreateBlock($"ParkourStep_{x}_{z}", worldPosition, scale, coverMaterial);
+            coverCells[x, z] = true;
+        }
+    }
+
+    private void BuildTallRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
+    {
+        int centerX = room.CenterX;
+        int centerZ = room.CenterZ;
+
+        for (int x = centerX - 1; x <= centerX + 1; x++)
+        {
+            for (int z = centerZ - 1; z <= centerZ + 1; z++)
+            {
+                if (x <= room.MinX || x >= room.MaxX || z <= room.MinZ || z >= room.MaxZ)
+                {
+                    continue;
+                }
+
+                if (wallCells[x, z] || coverCells[x, z])
+                {
+                    continue;
+                }
+
+                Vector3 worldPosition = CellToWorld(x, z, tallPlatformHeight * 0.5f, width, depth);
+                Vector3 scale = new Vector3(cellSize * 0.85f, tallPlatformHeight, cellSize * 0.85f);
+                CreateBlock($"TallPlatform_{x}_{z}", worldPosition, scale, coverMaterial);
+                coverCells[x, z] = true;
+            }
+        }
+
+        int stairStartX = room.MinX + 1;
+        int stairZ = room.CenterZ;
+        int stairSteps = Mathf.Min(4, room.Width - 2);
+        for (int step = 0; step < stairSteps; step++)
+        {
+            int x = stairStartX + step;
+            if (x >= room.MaxX)
+            {
+                break;
+            }
+
+            if (wallCells[x, stairZ] || coverCells[x, stairZ])
+            {
+                continue;
+            }
+
+            float stepHeight = Mathf.Lerp(0.6f, tallPlatformHeight, (step + 1f) / stairSteps);
+            Vector3 worldPosition = CellToWorld(x, stairZ, stepHeight * 0.5f, width, depth);
+            Vector3 scale = new Vector3(cellSize * 0.7f, stepHeight, cellSize * 0.7f);
+            CreateBlock($"TallStair_{x}_{stairZ}", worldPosition, scale, coverMaterial);
+            coverCells[x, stairZ] = true;
+        }
+    }
+
+    private void BuildVariedCoverRoom(Room room, Room spawnRoom, bool[,] wallCells, bool[,] coverCells, int width, int depth)
+    {
+        if (room.Intersects(spawnRoom, 0))
+        {
+            return;
+        }
+
+        int localCoverCount = UnityEngine.Random.Range(3, 8);
+        for (int i = 0; i < localCoverCount; i++)
+        {
+            int x = UnityEngine.Random.Range(room.MinX + 1, room.MaxX);
+            int z = UnityEngine.Random.Range(room.MinZ + 1, room.MaxZ);
+
+            if (wallCells[x, z] || coverCells[x, z])
+            {
+                continue;
+            }
+
+            float blockHeight = UnityEngine.Random.value < 0.4f ? floorBoxHeight : coverHeight;
+            float footprint = blockHeight <= floorBoxHeight ? 0.65f : 0.8f;
+            Vector3 worldPosition = CellToWorld(x, z, blockHeight * 0.5f, width, depth);
+            Vector3 scale = new Vector3(cellSize * footprint, blockHeight, cellSize * footprint);
+            CreateBlock($"RoomCover_{x}_{z}", worldPosition, scale, coverMaterial);
+            coverCells[x, z] = true;
         }
     }
 

@@ -165,15 +165,17 @@ Builds a new random map layout each time Play starts.
 
 **Features:**
 - Much larger default map size
-- Room-and-corridor layout suited for room-clearing gameplay
+- Long-corridor + room layout suited for room-clearing gameplay
 - Fully enclosed arena with floor, boundary walls, and ceiling
 - Higher density floor box/cover placement
 - Spawn-safe clear area around player center
-- Configurable seed, room count, and room sizing
+- Configurable seed, room count, room sizing, and corridor style
 - Room-based enemy wave encounters each run
 - Room door barriers lock on entry and unlock when room is cleared
 - Multiple enemy archetypes with different shape, size, speed, health, and damage
 - Auto-assigns generated geometry to `Ground` layer (if present)
+- Parkour room features including stairs and raised jump platforms
+- Tall-room style vertical elements for multi-height traversal
 
 ### EnemyAI.cs
 Controls simple enemy behavior using line-of-sight detection.

@@ -67,6 +67,8 @@ Assets/Scripts/EnemyAI.cs.meta
 Assets/Scripts/RandomMapGenerator.cs.meta
 Assets/Scripts/PlayerHealth.cs.meta
 Assets/Scripts/RoomEncounterController.cs.meta
+Assets/Scripts/EnemyHealthBarUI.cs.meta
+Assets/Scripts/PlayerHealthUI.cs.meta
 
 # Project-specific ignored model meta files
 *Pistol*.fbx.meta
