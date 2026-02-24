@@ -31,6 +31,7 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField] private float floorThickness = 0.5f;
     [SerializeField] private float wallHeight = 18f;
     [SerializeField] private float ceilingThickness = 0.4f;
+    [SerializeField, Range(2, 16)] private int ceilingTileSpanCells = 8;
     [SerializeField] private float coverHeight = 1.2f;
     [SerializeField] private float floorBoxHeight = 0.7f;
     [SerializeField, Range(0f, 0.5f)] private float floorBoxChance = 0.08f;
@@ -80,6 +81,7 @@ public class RandomMapGenerator : MonoBehaviour
     private Vector3 pendingSpawnBase;
     private int pendingSpawnAttempts;
     private const int MaxSpawnAttempts = 180;
+    private HashSet<Vector2Int> staircaseShaftCells = new HashSet<Vector2Int>();
 
     [Serializable]
     private class EnemyVariant
@@ -185,6 +187,8 @@ public class RandomMapGenerator : MonoBehaviour
 
     public void GenerateMap()
     {
+        staircaseShaftCells.Clear();
+
         PrepareRandom();
         PrepareMaterials();
         ResolveLayers();
@@ -502,38 +506,6 @@ public class RandomMapGenerator : MonoBehaviour
         int depth = wallCells.GetLength(1);
         bool[,] coverCells = new bool[width, depth];
 
-        for (int x = 1; x < width - 1; x++)
-        {
-            for (int z = 1; z < depth - 1; z++)
-            {
-                if (wallCells[x, z] || spawnRoom.Contains(x, z))
-                {
-                    continue;
-                }
-
-                int openNeighbors = 0;
-                openNeighbors += wallCells[x + 1, z] ? 0 : 1;
-                openNeighbors += wallCells[x - 1, z] ? 0 : 1;
-                openNeighbors += wallCells[x, z + 1] ? 0 : 1;
-                openNeighbors += wallCells[x, z - 1] ? 0 : 1;
-
-                if (openNeighbors < 2)
-                {
-                    continue;
-                }
-
-                float chance = coverChance;
-                if (openNeighbors >= 3)
-                {
-                    chance += floorBoxChance * 0.35f;
-                }
-
-                coverCells[x, z] = UnityEngine.Random.value < chance;
-            }
-        }
-
-        ApplyCoverLimitPerRoom(coverCells, rooms, spawnRoom);
-
         return coverCells;
     }
 
@@ -597,16 +569,36 @@ public class RandomMapGenerator : MonoBehaviour
 
     private void BuildCeiling(int width, int depth)
     {
-        float widthWorld = width * cellSize;
-        float depthWorld = depth * cellSize;
+        int tileSpan = Mathf.Clamp(ceilingTileSpanCells, 2, 16);
+        float topY = wallHeight + ceilingThickness * 0.5f;
 
-        GameObject ceiling = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        ceiling.name = "Ceiling";
-        ceiling.transform.SetParent(generatedRoot);
-        ceiling.transform.position = transform.position + new Vector3(0f, wallHeight + ceilingThickness * 0.5f, 0f);
-        ceiling.transform.localScale = new Vector3(widthWorld, ceilingThickness, depthWorld);
-        ApplyGroundLayer(ceiling);
-        ceiling.GetComponent<Renderer>().material = wallMaterial;
+        for (int startX = 0; startX < width; startX += tileSpan)
+        {
+            for (int startZ = 0; startZ < depth; startZ += tileSpan)
+            {
+                int endX = Mathf.Min(width - 1, startX + tileSpan - 1);
+                int endZ = Mathf.Min(depth - 1, startZ + tileSpan - 1);
+
+                if (TileContainsStairShaft(startX, endX, startZ, endZ))
+                {
+                    continue;
+                }
+
+                int spanX = endX - startX + 1;
+                int spanZ = endZ - startZ + 1;
+
+                Vector3 tileCenter = CellToWorld(startX + spanX / 2, startZ + spanZ / 2, topY, width, depth);
+                Vector3 tileScale = new Vector3(spanX * cellSize, ceilingThickness, spanZ * cellSize);
+
+                GameObject ceilingTile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                ceilingTile.name = $"Ceiling_{startX}_{startZ}";
+                ceilingTile.transform.SetParent(generatedRoot);
+                ceilingTile.transform.position = tileCenter;
+                ceilingTile.transform.localScale = tileScale;
+                ApplyGroundLayer(ceilingTile);
+                ceilingTile.GetComponent<Renderer>().material = wallMaterial;
+            }
+        }
     }
 
     private void BuildWalls(bool[,] wallCells)
@@ -631,26 +623,7 @@ public class RandomMapGenerator : MonoBehaviour
 
     private void BuildCover(bool[,] coverCells, bool[,] wallCells)
     {
-        int width = coverCells.GetLength(0);
-        int depth = coverCells.GetLength(1);
-
-        for (int x = 1; x < width - 1; x++)
-        {
-            for (int z = 1; z < depth - 1; z++)
-            {
-                if (!coverCells[x, z] || wallCells[x, z])
-                {
-                    continue;
-                }
-
-                bool lowFloorBox = UnityEngine.Random.value < floorBoxChance;
-                float currentHeight = lowFloorBox ? floorBoxHeight : coverHeight;
-                Vector3 worldPosition = CellToWorld(x, z, currentHeight * 0.5f, width, depth);
-                float footprint = lowFloorBox ? 0.7f : 0.85f;
-                Vector3 scale = new Vector3(cellSize * footprint, currentHeight, cellSize * footprint);
-                CreateBlock($"Cover_{x}_{z}", worldPosition, scale, coverMaterial);
-            }
-        }
+        // Intentionally disabled for now (user-requested no floor boxes/cover).
     }
 
     private void BuildRoomFeatures(List<Room> rooms, Room spawnRoom, bool[,] wallCells, bool[,] coverCells)
@@ -667,7 +640,7 @@ public class RandomMapGenerator : MonoBehaviour
             }
         }
 
-        int stairTargets = Mathf.Min(Mathf.Max(0, staircaseCount), eligibleRooms.Count);
+        int stairTargets = Mathf.Min(Mathf.Max(1, staircaseCount), eligibleRooms.Count);
         HashSet<int> staircaseRooms = new HashSet<int>();
         for (int s = 0; s < stairTargets; s++)
         {
@@ -689,26 +662,12 @@ public class RandomMapGenerator : MonoBehaviour
                 BuildStaircaseRoom(room, wallCells, coverCells, width, depth);
                 continue;
             }
-
-            float roll = UnityEngine.Random.value;
-            if (roll < parkourRoomChance)
-            {
-                BuildParkourRoom(room, wallCells, coverCells, width, depth);
-            }
-            else if (roll < parkourRoomChance + tallRoomChance)
-            {
-                BuildTallRoom(room, wallCells, coverCells, width, depth);
-            }
-            else
-            {
-                BuildVariedCoverRoom(room, spawnRoom, wallCells, coverCells, width, depth);
-            }
         }
     }
 
     private void BuildStaircaseRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
     {
-        int floors = Mathf.Clamp(maxFloors, 2, 3);
+        int floors = Mathf.Clamp(maxFloors, 2, 8);
         int stepsPerFloor = Mathf.Clamp(stairStepsPerFloor, 3, 8);
 
         bool alongX = room.Width >= room.Depth;
@@ -741,6 +700,7 @@ public class RandomMapGenerator : MonoBehaviour
                 Vector3 scale = new Vector3(cellSize * 0.72f, stepHeight, cellSize * 0.72f);
                 CreateBlock($"Staircase_{x}_{z}", worldPosition, scale, coverMaterial);
                 coverCells[x, z] = true;
+                MarkStairShaftCell(x, z, width, depth);
             }
 
             int platformRadius = 1;
@@ -765,9 +725,36 @@ public class RandomMapGenerator : MonoBehaviour
                     Vector3 scale = new Vector3(cellSize * 0.85f, platformHeight, cellSize * 0.85f);
                     CreateBlock($"Landing_{px}_{pz}", worldPosition, scale, coverMaterial);
                     coverCells[px, pz] = true;
+                    MarkStairShaftCell(px, pz, width, depth);
                 }
             }
         }
+    }
+
+    private void MarkStairShaftCell(int x, int z, int width, int depth)
+    {
+        for (int offsetX = -1; offsetX <= 1; offsetX++)
+        {
+            for (int offsetZ = -1; offsetZ <= 1; offsetZ++)
+            {
+                int cellX = Mathf.Clamp(x + offsetX, 0, width - 1);
+                int cellZ = Mathf.Clamp(z + offsetZ, 0, depth - 1);
+                staircaseShaftCells.Add(new Vector2Int(cellX, cellZ));
+            }
+        }
+    }
+
+    private bool TileContainsStairShaft(int startX, int endX, int startZ, int endZ)
+    {
+        foreach (Vector2Int cell in staircaseShaftCells)
+        {
+            if (cell.x >= startX && cell.x <= endX && cell.y >= startZ && cell.y <= endZ)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void BuildParkourRoom(Room room, bool[,] wallCells, bool[,] coverCells, int width, int depth)
