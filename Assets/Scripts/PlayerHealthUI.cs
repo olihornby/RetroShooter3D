@@ -29,12 +29,6 @@ public class PlayerHealthUI : MonoBehaviour
         pixel.SetPixel(0, 0, Color.white);
         pixel.Apply();
 
-        labelStyle = new GUIStyle(GUI.skin.label)
-        {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = fontSize,
-            normal = { textColor = textColor }
-        };
     }
 
     private void OnGUI()
@@ -47,6 +41,16 @@ public class PlayerHealthUI : MonoBehaviour
         if (playerHealth == null || pixel == null)
         {
             return;
+        }
+
+        if (labelStyle == null)
+        {
+            labelStyle = new GUIStyle
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = fontSize
+            };
+            labelStyle.normal.textColor = textColor;
         }
 
         GUI.depth = -1200;

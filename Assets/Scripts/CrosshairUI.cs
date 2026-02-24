@@ -24,13 +24,6 @@ public class CrosshairUI : MonoBehaviour
         pixel.SetPixel(0, 0, Color.white);
         pixel.Apply();
 
-        ammoStyle = new GUIStyle(GUI.skin.label)
-        {
-            alignment = TextAnchor.UpperCenter,
-            fontSize = ammoFontSize,
-            normal = { textColor = crosshairColor }
-        };
-
         weaponController = GetComponentInParent<WeaponController>();
         if (weaponController == null)
         {
@@ -72,6 +65,16 @@ public class CrosshairUI : MonoBehaviour
         if (weaponController == null)
         {
             return;
+        }
+
+        if (ammoStyle == null)
+        {
+            ammoStyle = new GUIStyle
+            {
+                alignment = TextAnchor.UpperCenter,
+                fontSize = ammoFontSize
+            };
+            ammoStyle.normal.textColor = crosshairColor;
         }
 
         ammoStyle.normal.textColor = crosshairColor;

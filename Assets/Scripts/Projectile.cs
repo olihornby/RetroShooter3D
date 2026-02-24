@@ -166,7 +166,9 @@ public class Projectile : MonoBehaviour
         impact.transform.rotation = Quaternion.LookRotation(normal);
 
         ParticleSystem particles = impact.AddComponent<ParticleSystem>();
+        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         var main = particles.main;
+        main.playOnAwake = false;
         main.duration = 0.35f;
         main.loop = false;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.08f, 0.2f);
@@ -190,6 +192,8 @@ public class Projectile : MonoBehaviour
         var velocity = particles.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
+        velocity.x = new ParticleSystem.MinMaxCurve(0f, 0f);
+        velocity.y = new ParticleSystem.MinMaxCurve(0f, 0f);
         velocity.z = new ParticleSystem.MinMaxCurve(0.5f, 1.8f);
 
         var colorOverLifetime = particles.colorOverLifetime;
