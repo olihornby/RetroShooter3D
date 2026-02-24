@@ -28,9 +28,9 @@ public partial class RandomMapGenerator : MonoBehaviour
     [SerializeField] private bool generateOnStart = true;
     [SerializeField] private bool useRandomSeed = true;
     [SerializeField] private int seed = 12345;
-    [SerializeField, Range(6, 36)] private int desiredRoomCount = 14;
-    [SerializeField, Range(4, 20)] private int minRoomSize = 8;
-    [SerializeField, Range(5, 32)] private int maxRoomSize = 26;
+    [SerializeField] private int desiredRoomCount = 14;
+    [SerializeField] private int minRoomSize = 8;
+    [SerializeField] private int maxRoomSize = 26;
     [SerializeField, Range(1, 4)] private int corridorWidth = 1;
     [SerializeField] private int spawnClearRadius = 5;
     [SerializeField, Range(0f, 0.6f)] private float coverChance = 0.07f;
@@ -42,6 +42,7 @@ public partial class RandomMapGenerator : MonoBehaviour
     [SerializeField] private float floorThickness = 0.5f;
     [SerializeField] private float wallHeight = 18f;
     [SerializeField] private float ceilingThickness = 0.4f;
+    [SerializeField] private int stackedFloorCount = 3;
     [SerializeField, Range(2, 16)] private int ceilingTileSpanCells = 8;
     [SerializeField, Range(0f, 0.6f)] private float platformVoidChance = 0.22f;
     [SerializeField, Range(2, 8)] private int maxPlatformLevels = 4;
@@ -228,7 +229,7 @@ public partial class RandomMapGenerator : MonoBehaviour
         BuildParkourRoomWalls(rooms, wallCells);
         BuildCover(coverCells, wallCells);
 
-        if (enableRoomFeatures)
+        if (enableRoomFeatures && GetStackedFloorCount() <= 1)
         {
             BuildRoomFeatures(rooms, spawnRoom, wallCells, coverCells);
         }
@@ -367,7 +368,7 @@ public partial class RandomMapGenerator : MonoBehaviour
         CarveRoom(cells, spawnRoom);
         rooms.Add(spawnRoom);
 
-        int targetRooms = Mathf.Clamp(Mathf.Max(14, desiredRoomCount), 14, 48);
+        int targetRooms = Mathf.Max(14, desiredRoomCount);
         int attempts = targetRooms * 80;
 
         for (int attempt = 0; attempt < attempts && rooms.Count < targetRooms; attempt++)
@@ -722,6 +723,21 @@ public partial class RandomMapGenerator : MonoBehaviour
         float minFootprint = Mathf.Clamp(Mathf.Min(platformFootprintMin, platformFootprintMax), 0.5f, 0.98f);
         float maxFootprint = Mathf.Clamp(Mathf.Max(platformFootprintMin, platformFootprintMax), minFootprint, 0.98f);
 
+        int floors = GetStackedFloorCount();
+        for (int floor = 0; floor < floors; floor++)
+        {
+            float floorYOffset = floor * wallHeight;
+            bool registerForSpawn = floor == 0;
+            BuildPlatformLayer(levels, roomIndexByCell, width, depth, floorYOffset, minFootprint, maxFootprint, registerForSpawn);
+        }
+
+        EnsureSpawnPlatforms(width, depth, spawnRoom);
+    }
+
+    private void BuildPlatformLayer(int[,] levels, int[,] roomIndexByCell, int width, int depth, float floorYOffset, float minFootprint, float maxFootprint, bool registerForSpawn)
+    {
+        int floorIndex = Mathf.RoundToInt(floorYOffset / Mathf.Max(0.01f, wallHeight));
+
         for (int x = 1; x < width - 1; x++)
         {
             for (int z = 1; z < depth - 1; z++)
@@ -732,7 +748,7 @@ public partial class RandomMapGenerator : MonoBehaviour
                     continue;
                 }
 
-                float topY = level * platformLevelHeight;
+                float topY = floorYOffset + level * platformLevelHeight;
                 float centerY = topY - floorThickness * 0.5f;
                 int roomIndex = roomIndexByCell[x, z];
                 bool isParkourCell = false;
@@ -746,19 +762,30 @@ public partial class RandomMapGenerator : MonoBehaviour
                     : cellSize;
 
                 GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                tile.name = $"Platform_{x}_{z}";
+                tile.name = $"Platform_{x}_{z}_F{floorIndex}";
                 tile.transform.SetParent(generatedRoot);
                 tile.transform.position = CellToWorld(x, z, centerY, width, depth);
                 tile.transform.localScale = new Vector3(footprint, floorThickness, footprint);
                 ApplyGroundLayer(tile);
                 tile.GetComponent<Renderer>().material = floorMaterial;
 
-                platformCells[x, z] = true;
-                platformTopHeights[x, z] = topY;
+                if (registerForSpawn)
+                {
+                    platformCells[x, z] = true;
+                    platformTopHeights[x, z] = topY;
+                }
             }
         }
+    }
 
-        EnsureSpawnPlatforms(width, depth, spawnRoom);
+    private int GetStackedFloorCount()
+    {
+        return Mathf.Max(1, stackedFloorCount);
+    }
+
+    private float GetTotalWallHeight()
+    {
+        return wallHeight * GetStackedFloorCount();
     }
 
     private void EnsureSpawnPlatforms(int width, int depth, Room spawnRoom)
@@ -795,7 +822,7 @@ public partial class RandomMapGenerator : MonoBehaviour
     private void BuildCeiling(int width, int depth)
     {
         int tileSpan = Mathf.Clamp(ceilingTileSpanCells, 2, 16);
-        float topY = wallHeight + ceilingThickness * 0.5f;
+        float topY = GetTotalWallHeight() + ceilingThickness * 0.5f;
 
         for (int startX = 0; startX < width; startX += tileSpan)
         {
@@ -830,6 +857,7 @@ public partial class RandomMapGenerator : MonoBehaviour
     {
         int width = wallCells.GetLength(0);
         int depth = wallCells.GetLength(1);
+        float wallTotalHeight = GetTotalWallHeight();
 
         for (int x = 0; x < width; x++)
         {
@@ -840,8 +868,8 @@ public partial class RandomMapGenerator : MonoBehaviour
                     continue;
                 }
 
-                Vector3 worldPosition = CellToWorld(x, z, wallHeight * 0.5f, width, depth);
-                CreateBlock($"Wall_{x}_{z}", worldPosition, new Vector3(cellSize, wallHeight, cellSize), wallMaterial);
+                Vector3 worldPosition = CellToWorld(x, z, wallTotalHeight * 0.5f, width, depth);
+                CreateBlock($"Wall_{x}_{z}", worldPosition, new Vector3(cellSize, wallTotalHeight, cellSize), wallMaterial);
             }
         }
     }
