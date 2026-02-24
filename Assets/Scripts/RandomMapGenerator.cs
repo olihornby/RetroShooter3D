@@ -662,6 +662,16 @@ public class RandomMapGenerator : MonoBehaviour
                 BuildStaircaseRoom(room, wallCells, coverCells, width, depth);
                 continue;
             }
+
+            float roll = UnityEngine.Random.value;
+            if (roll < parkourRoomChance)
+            {
+                BuildParkourRoom(room, wallCells, coverCells, width, depth);
+            }
+            else if (roll < parkourRoomChance + tallRoomChance)
+            {
+                BuildTallRoom(room, wallCells, coverCells, width, depth);
+            }
         }
     }
 
