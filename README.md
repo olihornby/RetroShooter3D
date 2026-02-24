@@ -60,6 +60,12 @@ Since this is a script-only project, you'll need to set up the scene in Unity:
    - Position it in front of player, e.g. (0, 1, 10)
    - Add Component → Damageable Target (script)
 
+7. **Enable Random Map Generation:**
+   - In Hierarchy, create Empty GameObject named "MapGenerator"
+   - Add Component → Random Map Generator (script)
+   - (Optional) disable or remove manually placed map geometry to avoid overlap
+   - Press Play: a new layout and random enemies are generated each run
+
 ### Controls
 
 - **WASD** - Move
@@ -82,6 +88,8 @@ RetroShooter3D/
 │       ├── WeaponController.cs      # Projectile weapon firing
 │       ├── Projectile.cs            # Projectile movement + impact effects
 │       ├── CrosshairUI.cs           # Center-screen aiming crosshair
+│       ├── RandomMapGenerator.cs    # Random arena generation each play
+│       ├── EnemyAI.cs               # Vision-based enemy chase behavior
 │       └── DamageableTarget.cs      # Basic health/damage receiver
 └── README.md
 ```
@@ -145,6 +153,25 @@ Adds health and death behavior for shootable targets.
 - Configurable max health
 - Public `TakeDamage` method
 - Destroy or disable on death
+
+### RandomMapGenerator.cs
+Builds a new random map layout each time Play starts.
+
+**Features:**
+- Randomized walls and cover blocks
+- Spawn-safe clear area around player center
+- Boundary walls to contain gameplay space
+- Configurable seed, map size, and density
+- Random enemy spawn points each run
+
+### EnemyAI.cs
+Controls simple enemy behavior using line-of-sight detection.
+
+**Features:**
+- Chases player only when inside vision radius
+- Requires clear line-of-sight to player
+- Stops close to player instead of overlapping
+- Works with `DamageableTarget` so enemies can be shot and destroyed
 
 ## Next Steps
 
