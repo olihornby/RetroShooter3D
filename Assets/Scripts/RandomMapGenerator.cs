@@ -36,6 +36,10 @@ public class RandomMapGenerator : MonoBehaviour
     [SerializeField] private int maxEnemiesPerRoom = 5;
     [SerializeField] private float barrierThickness = 0.45f;
 
+    [Header("Player Spawn")]
+    [SerializeField] private bool autoPositionPlayer = true;
+    [SerializeField] private float fallbackPlayerSpawnHeight = 1f;
+
     [Header("Enemy Vision")]
     [SerializeField] private LayerMask enemyVisionMask = ~0;
 
@@ -157,6 +161,11 @@ public class RandomMapGenerator : MonoBehaviour
         BuildCeiling(width, depth);
         BuildWalls(wallCells);
         BuildCover(coverCells, wallCells);
+
+        if (autoPositionPlayer)
+        {
+            PositionPlayerAtSpawn(spawnRoom, width, depth);
+        }
 
         if (spawnEnemies)
         {
@@ -774,6 +783,38 @@ public class RandomMapGenerator : MonoBehaviour
         if (generatedGroundLayer >= 0)
         {
             gameObject.layer = generatedGroundLayer;
+        }
+    }
+
+    private void PositionPlayerAtSpawn(Room spawnRoom, int width, int depth)
+    {
+        PlayerController player = FindObjectOfType<PlayerController>();
+        if (player == null)
+        {
+            return;
+        }
+
+        CharacterController controller = player.GetComponent<CharacterController>();
+        bool wasControllerEnabled = false;
+        if (controller != null)
+        {
+            wasControllerEnabled = controller.enabled;
+            controller.enabled = false;
+        }
+
+        Vector3 spawnBase = CellToWorld(spawnRoom.CenterX, spawnRoom.CenterZ, 0f, width, depth);
+        float spawnY = fallbackPlayerSpawnHeight;
+
+        if (controller != null)
+        {
+            spawnY = controller.height * 0.5f;
+        }
+
+        player.transform.position = new Vector3(spawnBase.x, spawnY, spawnBase.z);
+
+        if (controller != null)
+        {
+            controller.enabled = wasControllerEnabled;
         }
     }
 
