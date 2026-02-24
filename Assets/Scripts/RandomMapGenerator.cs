@@ -345,8 +345,8 @@ public partial class RandomMapGenerator : MonoBehaviour
 
     private bool[,] CreateRoomBasedWallLayout(out List<Room> rooms)
     {
-        int width = Mathf.Max(24, mapWidth);
-        int depth = Mathf.Max(24, mapDepth);
+        int width = Mathf.Max(96, mapWidth);
+        int depth = Mathf.Max(96, mapDepth);
         bool[,] cells = new bool[width, depth];
         rooms = new List<Room>();
 
@@ -366,7 +366,7 @@ public partial class RandomMapGenerator : MonoBehaviour
         CarveRoom(cells, spawnRoom);
         rooms.Add(spawnRoom);
 
-        int targetRooms = Mathf.Clamp(Mathf.Max(12, desiredRoomCount), 12, 36);
+        int targetRooms = Mathf.Clamp(Mathf.Max(14, desiredRoomCount), 14, 48);
         int attempts = targetRooms * 80;
 
         for (int attempt = 0; attempt < attempts && rooms.Count < targetRooms; attempt++)
@@ -397,6 +397,53 @@ public partial class RandomMapGenerator : MonoBehaviour
             CarveRoom(cells, candidate);
             CarveCorridor(cells, previous.CenterX, previous.CenterZ, candidate.CenterX, candidate.CenterZ, corridorWidth);
             rooms.Add(candidate);
+        }
+
+        if (rooms.Count < targetRooms)
+        {
+            int fallbackAttempts = (targetRooms - rooms.Count) * 140;
+            for (int attempt = 0; attempt < fallbackAttempts && rooms.Count < targetRooms; attempt++)
+            {
+                int roomWidth = UnityEngine.Random.Range(Mathf.Max(6, minRoomSize - 2), Mathf.Max(minRoomSize, maxRoomSize - 2) + 1);
+                int roomDepth = UnityEngine.Random.Range(Mathf.Max(6, minRoomSize - 2), Mathf.Max(minRoomSize, maxRoomSize - 2) + 1);
+
+                int minX = UnityEngine.Random.Range(1, width - roomWidth - 1);
+                int minZ = UnityEngine.Random.Range(1, depth - roomDepth - 1);
+                Room candidate = new Room(minX, minZ, minX + roomWidth - 1, minZ + roomDepth - 1);
+
+                bool overlaps = false;
+                for (int index = 0; index < rooms.Count; index++)
+                {
+                    if (candidate.Intersects(rooms[index], 0))
+                    {
+                        overlaps = true;
+                        break;
+                    }
+                }
+
+                if (overlaps)
+                {
+                    continue;
+                }
+
+                int nearestIndex = 0;
+                int nearestDistance = int.MaxValue;
+                for (int index = 0; index < rooms.Count; index++)
+                {
+                    Room existing = rooms[index];
+                    int distance = Mathf.Abs(existing.CenterX - candidate.CenterX) + Mathf.Abs(existing.CenterZ - candidate.CenterZ);
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestIndex = index;
+                    }
+                }
+
+                Room nearest = rooms[nearestIndex];
+                CarveRoom(cells, candidate);
+                CarveCorridor(cells, nearest.CenterX, nearest.CenterZ, candidate.CenterX, candidate.CenterZ, corridorWidth);
+                rooms.Add(candidate);
+            }
         }
 
         for (int x = 0; x < width; x++)
