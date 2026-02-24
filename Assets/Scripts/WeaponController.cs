@@ -349,10 +349,27 @@ public class WeaponController : MonoBehaviour
             return;
         }
 
-        CrosshairUI existingCrosshair = cameraTransform.GetComponent<CrosshairUI>();
+        Transform targetTransform = cameraTransform;
+        Camera targetCamera = targetTransform.GetComponent<Camera>();
+        if (targetCamera == null)
+        {
+            targetCamera = targetTransform.GetComponentInChildren<Camera>(true);
+            if (targetCamera != null)
+            {
+                targetTransform = targetCamera.transform;
+                cameraTransform = targetTransform;
+            }
+        }
+
+        if (targetCamera == null)
+        {
+            return;
+        }
+
+        CrosshairUI existingCrosshair = targetTransform.GetComponent<CrosshairUI>();
         if (existingCrosshair == null)
         {
-            cameraTransform.gameObject.AddComponent<CrosshairUI>();
+            targetTransform.gameObject.AddComponent<CrosshairUI>();
         }
 
         crosshairInitialized = true;
@@ -362,7 +379,42 @@ public class WeaponController : MonoBehaviour
     {
         if (cameraTransform != null)
         {
+            Camera existingCamera = cameraTransform.GetComponent<Camera>();
+            if (existingCamera == null)
+            {
+                existingCamera = cameraTransform.GetComponentInChildren<Camera>(true);
+                if (existingCamera != null)
+                {
+                    cameraTransform = existingCamera.transform;
+                }
+            }
+
             return;
+        }
+
+        Transform directChildCamera = transform.Find("Main Camera");
+        if (directChildCamera != null && directChildCamera.GetComponent<Camera>() != null)
+        {
+            cameraTransform = directChildCamera;
+            return;
+        }
+
+        Transform holderChildCamera = transform.Find("CameraHolder/Main Camera");
+        if (holderChildCamera != null && holderChildCamera.GetComponent<Camera>() != null)
+        {
+            cameraTransform = holderChildCamera;
+            return;
+        }
+
+        Transform cameraHolder = transform.Find("CameraHolder");
+        if (cameraHolder != null)
+        {
+            Camera holderCamera = cameraHolder.GetComponentInChildren<Camera>(true);
+            if (holderCamera != null)
+            {
+                cameraTransform = holderCamera.transform;
+                return;
+            }
         }
 
         Camera mainCamera = Camera.main;
