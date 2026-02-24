@@ -951,48 +951,46 @@ public partial class RandomMapGenerator : MonoBehaviour
         int maxPrimary = alongX ? room.MaxX - 2 : room.MaxZ - 2;
         int centerLane = alongX ? room.CenterZ : room.CenterX;
 
-        for (int story = 0; story < stories - 1; story++)
+        int story = UnityEngine.Random.Range(0, stories - 1);
+        float startHeight = story * wallHeight;
+        float endHeight = (story + 1) * wallHeight;
+        bool forward = UnityEngine.Random.value < 0.5f;
+
+        int runStartPrimary = forward ? minPrimary : maxPrimary;
+        int runEndPrimary = forward ? maxPrimary : minPrimary;
+
+        int startX = alongX ? runStartPrimary : centerLane;
+        int startZ = alongX ? centerLane : runStartPrimary;
+        int endX = alongX ? runEndPrimary : centerLane;
+        int endZ = alongX ? centerLane : runEndPrimary;
+
+        if (startX <= room.MinX || startX >= room.MaxX || startZ <= room.MinZ || startZ >= room.MaxZ)
         {
-            float startHeight = story * wallHeight;
-            float endHeight = (story + 1) * wallHeight;
-            bool forward = story % 2 == 0;
-
-            int runStartPrimary = forward ? minPrimary : maxPrimary;
-            int runEndPrimary = forward ? maxPrimary : minPrimary;
-
-            int startX = alongX ? runStartPrimary : centerLane;
-            int startZ = alongX ? centerLane : runStartPrimary;
-            int endX = alongX ? runEndPrimary : centerLane;
-            int endZ = alongX ? centerLane : runEndPrimary;
-
-            if (startX <= room.MinX || startX >= room.MaxX || startZ <= room.MinZ || startZ >= room.MaxZ)
-            {
-                continue;
-            }
-
-            if (endX <= room.MinX || endX >= room.MaxX || endZ <= room.MinZ || endZ >= room.MaxZ)
-            {
-                continue;
-            }
-
-            CreateFlatLandingPanel(story, "Bottom", startX, startZ, startHeight, width, depth, room, wallCells, coverCells);
-
-            CreateRampSegment(
-                story + 1,
-                startX,
-                startZ,
-                startHeight,
-                endX,
-                endZ,
-                endHeight,
-                width,
-                depth,
-                room,
-                wallCells,
-                coverCells);
-
-            CreateFlatLandingPanel(story, "Top", endX, endZ, endHeight, width, depth, room, wallCells, coverCells);
+            return;
         }
+
+        if (endX <= room.MinX || endX >= room.MaxX || endZ <= room.MinZ || endZ >= room.MaxZ)
+        {
+            return;
+        }
+
+        CreateFlatLandingPanel(story, "Bottom", startX, startZ, startHeight, width, depth, room, wallCells, coverCells);
+
+        CreateRampSegment(
+            story + 1,
+            startX,
+            startZ,
+            startHeight,
+            endX,
+            endZ,
+            endHeight,
+            width,
+            depth,
+            room,
+            wallCells,
+            coverCells);
+
+        CreateFlatLandingPanel(story, "Top", endX, endZ, endHeight, width, depth, room, wallCells, coverCells);
     }
 
     private void CreateFlatLandingPanel(
@@ -1070,15 +1068,18 @@ public partial class RandomMapGenerator : MonoBehaviour
         ApplyGroundLayer(ramp);
         ramp.GetComponent<Renderer>().material = coverMaterial;
 
-        Vector3 supportCenter = (startWorld + new Vector3(endWorld.x, startWorld.y, endWorld.z)) * 0.5f;
-        GameObject support = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        support.name = $"RampSupport_{floorIndex}_{startX}_{startZ}_{endX}_{endZ}";
-        support.transform.SetParent(generatedRoot);
-        support.transform.position = new Vector3(supportCenter.x, startHeight - floorThickness * 0.5f, supportCenter.z);
-        support.transform.rotation = yaw;
-        support.transform.localScale = new Vector3(cellSize * 0.9f, floorThickness, horizontalDistance + cellSize * 0.45f);
-        ApplyGroundLayer(support);
-        support.GetComponent<Renderer>().material = floorMaterial;
+        if (floorIndex <= 1)
+        {
+            Vector3 supportCenter = (startWorld + new Vector3(endWorld.x, startWorld.y, endWorld.z)) * 0.5f;
+            GameObject support = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            support.name = $"RampSupport_{floorIndex}_{startX}_{startZ}_{endX}_{endZ}";
+            support.transform.SetParent(generatedRoot);
+            support.transform.position = new Vector3(supportCenter.x, startHeight - floorThickness * 0.5f, supportCenter.z);
+            support.transform.rotation = yaw;
+            support.transform.localScale = new Vector3(cellSize * 0.9f, floorThickness, horizontalDistance + cellSize * 0.45f);
+            ApplyGroundLayer(support);
+            support.GetComponent<Renderer>().material = floorMaterial;
+        }
 
         int samples = Mathf.Max(4, Mathf.RoundToInt(horizontalDistance / cellSize) + 2);
         for (int sample = 0; sample <= samples; sample++)
