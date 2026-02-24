@@ -1,0 +1,39 @@
+* text=auto
+
+# Unity text-based assets
+*.cs text
+*.shader text
+*.cginc text
+*.hlsl text
+*.compute text
+*.unity text
+*.prefab text
+*.meta text
+*.mat text
+*.anim text
+*.asset text
+*.controller text
+*.overrideController text
+*.json text
+*.xml text
+*.yaml text
+*.yml text
+*.txt text
+*.md text
+
+# Common binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.tga binary
+*.psd binary
+*.exr binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.fbx binary
+*.blend binary
+*.ttf binary
+*.otf binary
+*.dll binary
