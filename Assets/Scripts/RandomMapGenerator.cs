@@ -698,6 +698,27 @@ public partial class RandomMapGenerator : MonoBehaviour
             }
         }
 
+        int[,] roomIndexByCell = new int[width, depth];
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < depth; z++)
+            {
+                roomIndexByCell[x, z] = -1;
+            }
+        }
+
+        for (int roomIndex = 0; roomIndex < rooms.Count; roomIndex++)
+        {
+            Room room = rooms[roomIndex];
+            for (int x = room.MinX; x <= room.MaxX; x++)
+            {
+                for (int z = room.MinZ; z <= room.MaxZ; z++)
+                {
+                    roomIndexByCell[x, z] = roomIndex;
+                }
+            }
+        }
+
         float minFootprint = Mathf.Clamp(Mathf.Min(platformFootprintMin, platformFootprintMax), 0.5f, 0.98f);
         float maxFootprint = Mathf.Clamp(Mathf.Max(platformFootprintMin, platformFootprintMax), minFootprint, 0.98f);
 
@@ -713,7 +734,16 @@ public partial class RandomMapGenerator : MonoBehaviour
 
                 float topY = level * platformLevelHeight;
                 float centerY = topY - floorThickness * 0.5f;
-                float footprint = cellSize * UnityEngine.Random.Range(minFootprint, maxFootprint);
+                int roomIndex = roomIndexByCell[x, z];
+                bool isParkourCell = false;
+                if (roomIndex > 0 && roomArchetypes.TryGetValue(roomIndex, out RoomArchetype archetype))
+                {
+                    isParkourCell = archetype == RoomArchetype.HallwayParkour || archetype == RoomArchetype.VerticalParkour;
+                }
+
+                float footprint = isParkourCell
+                    ? cellSize * UnityEngine.Random.Range(minFootprint, maxFootprint)
+                    : cellSize;
 
                 GameObject tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 tile.name = $"Platform_{x}_{z}";
