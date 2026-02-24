@@ -25,6 +25,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform groundCheck;
     [SerializeField] private float groundDistance = 0.4f;
     [SerializeField] private LayerMask groundMask;
+
+    [Header("Controller")]
+    [SerializeField] private float slopeLimit = 80f;
+    [SerializeField] private float stepOffset = 0.6f;
     
     private CharacterController controller;
     private Vector3 velocity;
@@ -37,6 +41,8 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         controller = GetComponent<CharacterController>();
+        controller.slopeLimit = Mathf.Clamp(slopeLimit, 30f, 89f);
+        controller.stepOffset = Mathf.Max(0f, stepOffset);
 
         if (GetComponent<PlayerHealth>() == null)
         {
